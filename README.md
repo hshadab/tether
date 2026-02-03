@@ -1,6 +1,6 @@
 # Trustless Risk Gating for Tether WDK
 
-Add machine learning-based transaction authorization to any WDK transfer flow. Cryptographic proofs guarantee the ML model ran correctly - no trust required.
+Add machine learning-based transaction authorization to any [Tether Wallet Development Kit (WDK)](https://docs.wallet.tether.io) transfer flow. Cryptographic zero knowledge machine learning proofs from [Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas) guarantee the ML model ran correctly - no trust required.
 
 ## What This Does
 

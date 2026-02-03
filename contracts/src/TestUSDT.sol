@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract TestUSDT is ERC20 {
     uint8 private constant _DECIMALS = 6;
 
-    constructor() ERC20("Test Tether USD", "tUSDT") {}
+    constructor() ERC20("Test Tether USD", "tUSDT") { }
 
     function decimals() public pure override returns (uint8) {
         return _DECIMALS;

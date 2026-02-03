@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use ark_bn254::Fr;
 use ark_serialize::CanonicalDeserialize;
 use jolt_core::{poly::commitment::dory::DoryCommitmentScheme, transcripts::KeccakTranscript};
-use k256::ecdsa::{SigningKey, signature::Signer};
+use k256::ecdsa::{signature::Signer, SigningKey};
 use onnx_tracer::{model, ProgramIO};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -25,10 +25,10 @@ type PCS = DoryCommitmentScheme;
 
 #[derive(Deserialize)]
 struct VerifyRequest {
-    proof: String,          // hex-encoded serialized proof
-    program_io: String,     // JSON-serialized ProgramIO
+    proof: String,      // hex-encoded serialized proof
+    program_io: String, // JSON-serialized ProgramIO
     tx: TxDetails,
-    model_hash: String,     // SHA256 of the ONNX model used by prover
+    model_hash: String, // SHA256 of the ONNX model used by prover
 }
 
 #[derive(Deserialize, Clone)]
@@ -78,9 +78,8 @@ impl NonceState {
     }
 
     fn save(&self) -> std::io::Result<()> {
-        let json = serde_json::to_string(self).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, e)
-        })?;
+        let json = serde_json::to_string(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         let mut f = File::create(&self.path)?;
         f.write_all(json.as_bytes())?;
         Ok(())
@@ -125,10 +124,7 @@ fn sha256_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-async fn verify_proof(
-    data: web::Data<AppState>,
-    req: web::Json<VerifyRequest>,
-) -> HttpResponse {
+async fn verify_proof(data: web::Data<AppState>, req: web::Json<VerifyRequest>) -> HttpResponse {
     // 0. Check model hash matches
     if req.model_hash != data.model_hash {
         return HttpResponse::BadRequest().json(VerifyResponse {
@@ -273,11 +269,11 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     // Parse signing key first so we fail fast before expensive model preprocessing
-    let cosigner_key_hex = std::env::var("COSIGNER_PRIVATE_KEY")
-        .expect("COSIGNER_PRIVATE_KEY env var must be set");
+    let cosigner_key_hex =
+        std::env::var("COSIGNER_PRIVATE_KEY").expect("COSIGNER_PRIVATE_KEY env var must be set");
     let key_bytes = hex::decode(&cosigner_key_hex).expect("Invalid COSIGNER_PRIVATE_KEY hex");
-    let signing_key = SigningKey::from_bytes((&key_bytes[..]).into())
-        .expect("Invalid secp256k1 private key");
+    let signing_key =
+        SigningKey::from_bytes((&key_bytes[..]).into()).expect("Invalid secp256k1 private key");
 
     let models_dir = std::env::var("MODELS_DIR").unwrap_or_else(|_| {
         let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -286,12 +282,11 @@ async fn main() -> std::io::Result<()> {
     });
     let model_path = format!("{models_dir}/authorization.onnx");
 
-    let model_hash = sha256_file(&model_path)
-        .expect("Failed to compute model hash");
+    let model_hash = sha256_file(&model_path).expect("Failed to compute model hash");
     log::info!("Model SHA256: {model_hash}");
 
-    let nonce_state_path = std::env::var("NONCE_STATE_PATH")
-        .unwrap_or_else(|_| "./nonce_state.json".to_string());
+    let nonce_state_path =
+        std::env::var("NONCE_STATE_PATH").unwrap_or_else(|_| "./nonce_state.json".to_string());
     let nonce_state = NonceState::load(&nonce_state_path);
     log::info!("Loaded nonce state (counter={})", nonce_state.counter);
 
@@ -347,7 +342,9 @@ async fn main() -> std::io::Result<()> {
             .route("/health", web::get().to(health))
             .route(
                 "/verify",
-                web::post().to(verify_proof).wrap(Governor::new(&governor_conf)),
+                web::post()
+                    .to(verify_proof)
+                    .wrap(Governor::new(&governor_conf)),
             )
     })
     .bind(("0.0.0.0", port))?
@@ -404,10 +401,7 @@ mod tests {
     #[test]
     fn test_argmax_empty() {
         let output_data: Vec<i32> = vec![];
-        let result = output_data
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.cmp(b.1));
+        let result = output_data.iter().enumerate().max_by(|a, b| a.1.cmp(b.1));
         assert!(result.is_none());
     }
 

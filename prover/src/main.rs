@@ -4,7 +4,12 @@ use jolt_core::{poly::commitment::dory::DoryCommitmentScheme, transcripts::Kecca
 use onnx_tracer::{model, tensor::Tensor};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, fs::File, io::Read, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 use zkml_jolt_core::jolt::JoltSNARK;
 
 /// Jolt lookup table size (2^14 = 16384 entries).
@@ -84,7 +89,9 @@ fn validate_features(features: &InputFeatures) -> Result<(), String> {
     ];
     for (name, val) in checks {
         if val > 64 {
-            return Err(format!("Feature '{name}' value {val} out of range (0..=64)"));
+            return Err(format!(
+                "Feature '{name}' value {val} out of range (0..=64)"
+            ));
         }
     }
     Ok(())
@@ -148,7 +155,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
         .ok_or("Empty model output")?;
-    let decision = if pred_idx == 0 { "AUTHORIZED" } else { "DENIED" };
+    let decision = if pred_idx == 0 {
+        "AUTHORIZED"
+    } else {
+        "DENIED"
+    };
 
     if decision == "DENIED" {
         let out = ProverOutput {
@@ -234,7 +245,10 @@ mod tests {
         };
 
         let vec = build_input_vector(&features, &vocab);
-        assert!(vec.iter().all(|&v| v == 0), "All values should be zero with empty vocab");
+        assert!(
+            vec.iter().all(|&v| v == 0),
+            "All values should be zero with empty vocab"
+        );
     }
 
     #[test]
@@ -258,8 +272,13 @@ mod tests {
     #[test]
     fn test_validate_features_valid() {
         let f = InputFeatures {
-            budget: 15, trust: 7, amount: 8, category: 0,
-            velocity: 2, day: 1, time: 1,
+            budget: 15,
+            trust: 7,
+            amount: 8,
+            category: 0,
+            velocity: 2,
+            day: 1,
+            time: 1,
         };
         assert!(validate_features(&f).is_ok());
     }
@@ -267,8 +286,13 @@ mod tests {
     #[test]
     fn test_validate_features_out_of_range() {
         let f = InputFeatures {
-            budget: 100, trust: 7, amount: 8, category: 0,
-            velocity: 2, day: 1, time: 1,
+            budget: 100,
+            trust: 7,
+            amount: 8,
+            category: 0,
+            velocity: 2,
+            day: 1,
+            time: 1,
         };
         assert!(validate_features(&f).is_err());
     }
