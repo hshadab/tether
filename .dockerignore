@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+.gitmodules
+
+# Rust build artifacts (we copy only the release binary)
+**/target/debug
+**/target/.rustc_info.json
+**/*.rs.bk
+
+# Node
+**/node_modules
+**/dist
+**/.npm
+
+# Foundry
+contracts/out
+contracts/cache
+contracts/broadcast
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docs
+*.md
+!README.md
+
+# Misc
+.env
+.env.local
+*.log

@@ -1,0 +1,22 @@
+{
+  "name": "zkml-gated-spending",
+  "version": "1.0.0",
+  "description": "zkML-gated USDt transfers using Jolt-Atlas + Tether WDK",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "demo": "node --loader ts-node/esm src/demo.ts",
+    "start": "node dist/demo.js",
+    "test": "node --loader ts-node/esm --test src/__tests__/*.test.ts"
+  },
+  "dependencies": {
+    "@tetherto/wdk": "^1.0.0-beta.5",
+    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.5",
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.5.0"
+  }
+}

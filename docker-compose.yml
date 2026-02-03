@@ -1,0 +1,23 @@
+services:
+  cosigner:
+    build:
+      context: .
+      dockerfile: cosigner/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - COSIGNER_PRIVATE_KEY
+      - RUST_LOG=info
+      - NONCE_STATE_PATH=/data/nonce_state.json
+    volumes:
+      - cosigner-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  cosigner-data:

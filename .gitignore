@@ -1,0 +1,30 @@
+# Rust build artifacts
+**/target/
+
+# Node.js
+node_modules/
+dist/
+
+# Generated files
+*.srs
+nonce_state.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/

@@ -1,0 +1,31 @@
+[package]
+name = "zkml-cosigner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-bn254 = "0.5.0"
+ark-serialize = { version = "0.5.0", default-features = false, features = ["derive"] }
+# Pinned via Cargo.lock; branch tracks upstream jolt-atlas workspace
+jolt-core = { git = "https://github.com/ICME-Lab/zkml-jolt", branch = "dev", package = "jolt-core", default-features = true }
+zkml-jolt-core = { path = "../../jolt-atlas/zkml-jolt-core" }
+onnx-tracer = { path = "../../jolt-atlas/onnx-tracer", features = ["matmul_power_of_two_padding"] }
+actix-web = "4"
+actix-rt = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+k256 = { version = "0.13", features = ["ecdsa-core", "ecdsa"] }
+tokio = { version = "1", features = ["full"] }
+env_logger = "0.11"
+log = "0.4"
+actix-governor = "0.6"
+sha2 = "0.10"
+
+# Must match jolt-atlas workspace patches; Cargo.lock pins the exact commit
+[patch.crates-io]
+ark-ff = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
+ark-ec = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
+ark-serialize = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
+ark-bn254 = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
