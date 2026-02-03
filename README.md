@@ -1,50 +1,43 @@
-# Trustless Risk Gating for Tether WDK
+# Trustless ML Guardrails for Tether WDK
 
-Add machine learning-based transaction authorization to any [Tether Wallet Development Kit (WDK)](https://docs.wallet.tether.io) transfer flow. Cryptographic zero knowledge machine learning proofs from [Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas) guarantee the ML model ran correctly - no trust required.
+Protect user funds with machine learning guardrails that **no one can bypass or fake** — not even the wallet operator.
 
-## What This Does
+This project adds an ML-based safety layer to any [Tether Wallet Development Kit (WDK)](https://docs.wallet.tether.io) wallet. Before a transfer goes through, a trained model evaluates the transaction for risk — unusual spending patterns, velocity spikes, budget overruns. If the model flags the transaction, the funds don't move. Period.
 
-This project lets you **gate token transfers with an ML model** and prove the model actually approved the transaction. The proof is cryptographically verifiable by anyone, making the authorization trustless.
+The key difference from traditional server-side checks: **cryptographic proofs** (via [Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM) guarantee the ML model actually ran and actually approved. No one can skip the check, swap the model, or forge an approval. Users and auditors can verify every decision independently.
 
-**Example flow:**
-1. User wants to send 100 USDT
-2. Your ML model evaluates the transaction (budget, trust score, velocity, etc.)
-3. If approved: a cryptographic proof is generated showing the model said "yes"
-4. A co-signer verifies the proof and signs off
-5. WDK executes the transfer
+## Why This Exists
 
-If the model says "no" or the proof is invalid, the transfer is blocked.
+Wallets today rely on server-side fraud checks that users have to trust blindly. There's no way to know whether a risk check actually happened, whether it used the right model, or whether someone with database access quietly whitelisted a suspicious transaction.
 
-## Why This Matters for WDK Developers
+This is a real problem for custodial and semi-custodial wallets handling stablecoins at scale. Users deserve to know that the guardrails protecting their funds are actually in place — not just promised.
 
-### The Problem
-You want to add smart authorization rules to your wallet - fraud detection, spending limits, risk scoring. But how do you prove your rules actually ran? How do you prevent someone from bypassing the check?
+**zkML solves this.** The ML model runs inside a zero-knowledge virtual machine, which produces a cryptographic proof of the model's execution. That proof is publicly verifiable. Either the model approved the transaction with a valid proof, or the transfer doesn't happen.
 
-### The Solution
-Zero-knowledge proofs make it trustless. The ML model runs inside a zkVM (Jolt), which produces a proof that:
-- The correct model was used (verified by hash)
-- The model received the claimed inputs
-- The model output was "AUTHORIZED"
+**What this means in practice:**
+- A compromised server **can't silently disable** fraud detection
+- A malicious insider **can't swap the model** for a permissive one (the model hash is verified)
+- A sophisticated attacker **can't forge an approval** — the proof is cryptographically bound to the model, inputs, and output
+- Users and regulators **can independently verify** that every transfer was properly authorized
 
-Anyone can verify the proof independently. The co-signer only approves transfers with valid proofs. No valid proof = no transfer.
+## How It Protects Funds
 
-### Benefits
+1. User initiates a 100 USDT transfer
+2. The ML model evaluates the transaction against real-time signals — spending budget, trust score, transaction velocity, amount category, time of day
+3. **If the model says AUTHORIZED:** a SNARK proof is generated proving the model genuinely approved this specific transaction
+4. The co-signer independently verifies the proof and signs off only if it's valid
+5. The WDK executes the transfer
+6. **If the model says DENIED:** no proof is generated, the co-signer never signs, and the funds stay put
 
-| Feature | Benefit |
-|---------|---------|
-| **Trustless verification** | Anyone can verify the proof - no need to trust the server |
-| **Verifiable ML** | Prove the model ran correctly without revealing weights |
-| **Drop-in for WDK** | Works with existing `account.transfer()` calls |
-| **Tamper-proof** | Can't bypass the model or forge approvals |
-| **Replay protection** | Each approval has a unique nonce |
+There's no way around step 3. Without a valid proof from the correct model, the co-signer won't sign, and the transfer can't execute.
 
 ## Use Cases
 
-- **Fraud detection** - Block suspicious transactions before they execute
-- **Spending policies** - Enforce daily limits, category restrictions, velocity checks
-- **Risk scoring** - Require additional approval for high-risk transfers
-- **Compliance rules** - Prove that policy checks ran on every transaction
-- **Multi-party authorization** - ML model as one signer in a multi-sig-like flow
+- **Fraud prevention** — Block unauthorized or suspicious transfers before funds leave the wallet. Unusual patterns (sudden large transfers, rapid-fire transactions, new recipients) get caught by the model and stopped with cryptographic certainty.
+- **Spending guardrails** — Enforce budgets, daily limits, and category restrictions. A corporate treasury wallet can cap daily outflows; a consumer wallet can enforce self-set spending limits that can't be bypassed in a moment of weakness.
+- **Risk-based authorization** — Low-risk transfers go through instantly. High-risk ones (large amounts, low trust scores, unusual velocity) are blocked or escalated. The model makes the call, and the proof ensures the call was legitimate.
+- **Auditable compliance** — Every transfer carries a verifiable proof that the policy model ran. Regulators and auditors don't need to trust logs — they can verify the proofs directly.
+- **Theft protection** — Even if an attacker obtains wallet credentials, the ML guardrails still block transactions that don't match the user's normal behavior. The attacker can't bypass the model because they can't forge the proof.
 
 ## Quick Start
 
