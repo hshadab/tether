@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
-import "../src/TestUSDT.sol";
+import { Test } from "forge-std/Test.sol";
+import { TestUSDT } from "../src/TestUSDT.sol";
 
 contract TestUSDTTest is Test {
     TestUSDT public token;

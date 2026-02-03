@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Script.sol";
-import "../src/TestUSDT.sol";
+import { Script, console } from "forge-std/Script.sol";
+import { TestUSDT } from "../src/TestUSDT.sol";
 
 contract DeployTestUSDT is Script {
     function run() external {
