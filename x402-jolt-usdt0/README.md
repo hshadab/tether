@@ -1,10 +1,20 @@
 # ZK-402: No Proof, No Payment
 
+> Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 + WDK + USDT0 payment demo on Plasma — by adding zero-knowledge ML proof verification as a core primitive in the payment path. Community contribution and partnership PoC for the Tether ecosystem.
+
 Zero-knowledge proof-gated USDT0 micropayments on [Plasma](https://www.plasma.to), built natively on the Tether stack.
 
 Every HTTP payment is cryptographically bound to a JOLT-Atlas zkML proof. If the proof doesn't match the payment, the payment is rejected before it ever touches the chain. Payments settle in [USDT0](https://usdt0.to) on Plasma (chain ID 9745). Wallets are managed by [Tether WDK](https://docs.wallet.tether.io). The [x402](https://www.x402.org/) protocol handles the HTTP payment negotiation.
 
 **Tether primitives used:** WDK (wallet signing + key management) | USDT0 (payment token) | Plasma (settlement chain) | x402 (HTTP payment protocol)
+
+### How This Relates to x402-usdt0
+
+[baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) implements the standard x402 payment flow on Plasma using the official `@x402/*` SDK and WDK packages. It's the clean baseline: client pays, server verifies the signature, settlement happens on-chain.
+
+This project takes that same payment concept and rebuilds the middleware with zkML verification baked in. The x402 flow was reimplemented (rather than wrapping `@x402/express`) because the ZK proof binding check must run *inside* the payment verification path — it's not an optional add-on, it's a gate that every payment must pass through.
+
+**What's new here:** Every USDT0 payment carries a SNARK proof that an ML model authorized the transaction for these exact parameters (amount, recipient, chain, token). The proof is cryptographically bound to the payment via SHA-256 — tamper with any parameter and the binding breaks. Three attack scenarios demonstrate this in real-time.
 
 ## What This Does
 
