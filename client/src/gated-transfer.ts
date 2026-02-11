@@ -1,7 +1,8 @@
 import { execFileSync, execSync } from "child_process";
-import { resolve, dirname } from "path";
+import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { writeFileSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -90,7 +91,7 @@ export async function submitToCosigner(
   console.log(`[Cosigner] Request body size: ${body.length} bytes`);
 
   // Write payload to temp file and use curl (Node.js fetch has issues with large payloads)
-  const tmpFile = `/tmp/cosigner_request_${Date.now()}.json`;
+  const tmpFile = join(tmpdir(), `cosigner_request_${Date.now()}.json`);
   writeFileSync(tmpFile, body);
 
   try {

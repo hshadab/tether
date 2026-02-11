@@ -85,12 +85,10 @@ impl NonceState {
         Ok(())
     }
 
-    fn next_nonce(&mut self) -> u64 {
+    fn next_nonce(&mut self) -> Result<u64, std::io::Error> {
         self.counter += 1;
-        if let Err(e) = self.save() {
-            log::error!("Failed to persist nonce state: {e}");
-        }
-        self.counter
+        self.save()?;
+        Ok(self.counter)
     }
 }
 
@@ -110,6 +108,8 @@ fn keccak256(data: &[u8]) -> [u8; 32] {
 }
 
 /// Compute SHA256 hash of a file, returned as hex string.
+// NOTE: Duplicate of sha256_file in prover/src/main.rs.
+// Workspace extraction deferred because jolt-atlas path deps make shared crates complex.
 fn sha256_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
@@ -228,7 +228,19 @@ async fn verify_proof(data: web::Data<AppState>, req: web::Json<VerifyRequest>) 
     // 5. Generate nonce and sign approval
     let nonce = {
         let mut state = data.nonce_state.lock().unwrap_or_else(|e| e.into_inner());
-        state.next_nonce()
+        match state.next_nonce() {
+            Ok(n) => n,
+            Err(e) => {
+                log::error!("Failed to persist nonce state: {e}");
+                return HttpResponse::InternalServerError().json(VerifyResponse {
+                    approved: false,
+                    signature: None,
+                    nonce: None,
+                    timestamp: None,
+                    reason: Some(format!("Internal error: failed to persist nonce: {e}")),
+                });
+            }
+        }
     };
 
     // Include timestamp for signature expiration
@@ -347,7 +359,10 @@ async fn main() -> std::io::Result<()> {
                     .wrap(Governor::new(&governor_conf)),
             )
     })
-    .bind(("0.0.0.0", port))?
+    .bind((
+        std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "127.0.0.1".to_string()),
+        port,
+    ))?
     .run()
     .await
 }
@@ -417,10 +432,10 @@ mod tests {
         let mut state = NonceState::load(path_str);
         assert_eq!(state.counter, 0);
 
-        let n1 = state.next_nonce();
+        let n1 = state.next_nonce().unwrap();
         assert_eq!(n1, 1);
 
-        let n2 = state.next_nonce();
+        let n2 = state.next_nonce().unwrap();
         assert_eq!(n2, 2);
 
         // Reload from file - counter should be preserved
@@ -428,5 +443,23 @@ mod tests {
         assert_eq!(reloaded.counter, 2);
 
         let _ = std::fs::remove_file(path_str);
+    }
+
+    #[actix_web::test]
+    async fn test_health_endpoint() {
+        use actix_web::test;
+
+        let app = test::init_service(
+            App::new().route("/health", web::get().to(health)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/health").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body, serde_json::json!({"status": "ok"}));
     }
 }

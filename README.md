@@ -1,56 +1,130 @@
-# Trustless ML Guardrails for Tether WDK
+# zkML Guardrails for Tether WDK + USDT0 on Plasma
 
-Protect user funds with machine learning guardrails that **no one can bypass or fake** — not even the wallet operator.
+**Zero-knowledge machine learning meets the Tether stack.** This project is a native integration of zkML-powered transaction guardrails into [Tether WDK](https://docs.wallet.tether.io), settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to) — Tether's own chain.
 
-This project adds an ML-based safety layer to any [Tether Wallet Development Kit (WDK)](https://docs.wallet.tether.io) wallet. Before a transfer goes through, a trained model evaluates the transaction for risk — unusual spending patterns, velocity spikes, budget overruns. If the model flags the transaction, the funds don't move. Period.
+Every piece of this system is built directly on Tether primitives:
 
-The key difference from traditional server-side checks: **cryptographic proofs** (via [Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM) guarantee the ML model actually ran and actually approved. No one can skip the check, swap the model, or forge an approval. Users and auditors can verify every decision independently.
+| Layer | Tether Primitive | What It Does Here |
+|-------|-----------------|-------------------|
+| **Wallet** | [Tether WDK](https://docs.wallet.tether.io) | Signs transactions, manages keys, executes transfers |
+| **Token** | [USDT0](https://usdt0.to) | The payment unit — omnichain USDT via LayerZero |
+| **Chain** | [Plasma](https://www.plasma.to) (chain ID 9745) | Where payments settle — Tether's own L1 |
+| **Protocol** | [x402](https://www.x402.org/) | HTTP-native micropayments in USDT0 |
 
-## Why This Exists
+WDK is not a bolt-on — it's the signing and wallet layer. USDT0 is not a placeholder token — it's the real payment rail. Plasma is not a testnet fallback — it's the default network. This is what building on Tether as a first-class primitive looks like.
 
-Wallets today rely on server-side fraud checks that users have to trust blindly. There's no way to know whether a risk check actually happened, whether it used the right model, or whether someone with database access quietly whitelisted a suspicious transaction.
+## What This Does
 
-This is a real problem for custodial and semi-custodial wallets handling stablecoins at scale. Users deserve to know that the guardrails protecting their funds are actually in place — not just promised.
+An ML model evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. But unlike server-side fraud checks that users have to trust blindly, the model runs inside a zero-knowledge VM ([Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation actually happened. No one can skip the check, swap the model, or forge an approval.
 
-**zkML solves this.** The ML model runs inside a zero-knowledge virtual machine, which produces a cryptographic proof of the model's execution. That proof is publicly verifiable. Either the model approved the transaction with a valid proof, or the transfer doesn't happen.
+**The Tether WDK connection:** The guardrails sit between `gatedTransfer()` and `account.transfer()`. The WDK wallet won't execute the transfer unless the zkML proof is valid and the cosigner has signed off. This is native WDK integration — the guardrails use WDK's own signing, key management, and transfer execution.
 
-**What this means in practice:**
-- A compromised server **can't silently disable** fraud detection
-- A malicious insider **can't swap the model** for a permissive one (the model hash is verified)
-- A sophisticated attacker **can't forge an approval** — the proof is cryptographically bound to the model, inputs, and output
-- Users and regulators **can independently verify** that every transfer was properly authorized
+**The USDT0 connection:** Every payment in the x402 demo is denominated in real USDT0. The proof is cryptographically bound to the USDT0 token address, the payment amount, and the recipient — change any of these and the proof becomes invalid. This isn't a wrapped or synthetic token. It's USDT0 on Plasma.
+
+**The Plasma connection:** Plasma is the default settlement chain. The x402 server, client, and facilitator all point to `rpc.plasma.to` (chain ID 9745) out of the box. Gas is paid in XPL. No configuration needed to run on Tether's chain.
 
 ## How It Protects Funds
 
-1. User initiates a 100 USDT transfer
-2. The ML model evaluates the transaction against real-time signals — spending budget, trust score, transaction velocity, amount category, time of day
-3. **If the model says AUTHORIZED:** a SNARK proof is generated proving the model genuinely approved this specific transaction
-4. The co-signer independently verifies the proof and signs off only if it's valid
-5. The WDK executes the transfer
-6. **If the model says DENIED:** no proof is generated, the co-signer never signs, and the funds stay put
+```
+User initiates 100 USDT0 transfer via WDK
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│  ML MODEL (inside Jolt zkVM)                │
+│  Evaluates: budget, trust, velocity,        │
+│  amount, category, time of day              │
+│  Output: AUTHORIZED or DENIED               │
+│  + cryptographic proof of execution         │
+└──────────────────┬──────────────────────────┘
+                   │
+         ┌─────────┴─────────┐
+         │                   │
+    AUTHORIZED            DENIED
+    + SNARK proof         No proof generated
+         │                   │
+         ▼                   ▼
+┌──────────────────┐  ┌──────────────────┐
+│  CO-SIGNER       │  │  TRANSFER        │
+│  Verifies proof  │  │  BLOCKED         │
+│  Signs approval  │  │  Funds stay put  │
+└────────┬─────────┘  └──────────────────┘
+         │
+         ▼
+┌──────────────────┐
+│  WDK TRANSFER    │
+│  USDT0 on Plasma │
+│  Tx lands on-    │
+│  chain           │
+└──────────────────┘
+```
 
-There's no way around step 3. Without a valid proof from the correct model, the co-signer won't sign, and the transfer can't execute.
+Without a valid proof from the correct model, the cosigner won't sign and the WDK transfer can't execute.
 
-## Use Cases
+## x402 Demo: Proof-Gated Payments in USDT0
 
-- **Fraud prevention** — Block unauthorized or suspicious transfers before funds leave the wallet. Unusual patterns (sudden large transfers, rapid-fire transactions, new recipients) get caught by the model and stopped with cryptographic certainty.
-- **Spending guardrails** — Enforce budgets, daily limits, and category restrictions. A corporate treasury wallet can cap daily outflows; a consumer wallet can enforce self-set spending limits that can't be bypassed in a moment of weakness.
-- **Risk-based authorization** — Low-risk transfers go through instantly. High-risk ones (large amounts, low trust scores, unusual velocity) are blocked or escalated. The model makes the call, and the proof ensures the call was legitimate.
-- **Auditable compliance** — Every transfer carries a verifiable proof that the policy model ran. Regulators and auditors don't need to trust logs — they can verify the proofs directly.
-- **Theft protection** — Even if an attacker obtains wallet credentials, the ML guardrails still block transactions that don't match the user's normal behavior. The attacker can't bypass the model because they can't forge the proof.
+The `x402-jolt-usdt0/` directory demonstrates zkML proofs integrated into the [x402 payment protocol](https://www.x402.org/) — HTTP-native micropayments where every request costs 0.0001 USDT0 on Plasma.
+
+**How it works in plain English:**
+
+A weather API charges a tiny fee per request. Instead of an API key, the client pays per-request using HTTP 402. Every payment must include a ZK proof that an ML model approved the transaction.
+
+1. **Client requests weather data.** Server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
+
+2. **Client loads a ZK proof** pre-generated by the Rust prover (ONNX model running inside Jolt zkVM). The proof is cryptographically bound to the exact payment parameters — amount, recipient, chain ID 9745, and the USDT0 token address.
+
+3. **Client signs the USDT0 payment** via WDK and retries the request with both the payment signature and ZK proof attached as HTTP headers.
+
+4. **Server checks two gates:**
+   - **Payment gate:** Is the USDT0 payment signature valid?
+   - **Proof binding gate:** Does the ZK proof hash match these exact payment parameters? If an attacker changes the amount from 0.0001 to 10 USDT0, the SHA-256 binding hash won't match — rejected before anything hits Plasma.
+
+5. **Cosigner verifies the SNARK** — confirming the ML model genuinely ran and approved.
+
+6. **Weather data returned.** Payment settles in USDT0 on Plasma.
+
+The demo includes three scenarios:
+- **Normal flow** — proof and payment match, 200 OK
+- **Tampered amount** — attacker inflates USDT0 amount, 403 rejected at binding check
+- **Tampered recipient** — attacker redirects payment, 403 rejected at binding check
+
+A React dashboard visualizes every step in real-time via Server-Sent Events.
+
+See [`x402-jolt-usdt0/README.md`](x402-jolt-usdt0/README.md) for full setup and usage.
+
+## Use Cases for Tether WDK Wallets
+
+- **Fraud prevention** — Block suspicious USDT0 transfers before they leave the WDK wallet. The ML model catches unusual patterns and the proof guarantees the check actually ran.
+- **Spending guardrails** — Enforce budgets, daily limits, and category restrictions on USDT0 transfers. Can't be bypassed — the proof is required.
+- **Risk-based authorization** — Low-risk USDT0 transfers go through instantly. High-risk ones are blocked. The model decides, the proof ensures it was legitimate.
+- **Auditable compliance** — Every USDT0 transfer carries a verifiable proof. Auditors verify proofs directly instead of trusting logs.
+- **Theft protection** — Even with stolen credentials, the ML guardrails block transfers that don't match normal behavior. The attacker can't forge the proof.
 
 ## Quick Start
 
-### Run the Real Demo (Sepolia Testnet)
-
-This executes actual zkML proofs and real token transfers:
+### x402 Demo (Plasma — Real USDT0)
 
 ```bash
-# 1. Start the co-signer (verifies proofs)
+# 1. Start the cosigner (verifies proofs)
 cd cosigner
 COSIGNER_PRIVATE_KEY=$(openssl rand -hex 32) cargo run --release
 
-# 2. Run the demo (in another terminal)
+# 2. Fund the client wallet with USDT0 on Plasma
+cd x402-jolt-usdt0
+cp .env.example .env   # edit MNEMONIC, PAY_TO_ADDRESS, COSIGNER_PRIVATE_KEY
+npm install
+npm run fund-wallet    # shows address + balances + funding instructions
+
+# 3. Generate proof cache (one-time)
+npm run generate-cache
+
+# 4. Start the server + dashboard
+npm run dev
+# Open http://localhost:5173
+```
+
+### WDK Client Demo (Sepolia Testnet)
+
+```bash
 cd client
 npm install
 export COSIGNER_URL=http://localhost:3001
@@ -60,77 +134,26 @@ export TEST_USDT_ADDRESS=0x959413cfD31eBe4Bc81A57b284cD638b4Be88500
 npm run demo
 ```
 
-The demo runs two scenarios:
-- **Low-risk transaction** (high budget, high trust) → AUTHORIZED → transfer executes
-- **High-risk transaction** (low budget, low trust) → DENIED → transfer blocked
-
-### View the Interactive Visualization
-
-To understand the flow visually:
-
-```bash
-cd demo
-npm start
-# Open http://localhost:8080
-```
-
-Note: The browser UI is a visualization of the flow. It simulates the steps for demonstration purposes. Run `npm run demo` in the client folder for real proofs and real transfers.
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  YOUR APP                                                        │
-│  ─────────                                                       │
-│  1. Collect transaction features (amount, trust, velocity...)   │
-│  2. Call gatedTransfer() instead of account.transfer()          │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  PROVER (Rust CLI)                                               │
-│  ────────────────                                                │
-│  • Runs your ONNX model inside Jolt zkVM                        │
-│  • Outputs: AUTHORIZED/DENIED + cryptographic proof             │
-│  • Proof size: ~110KB                                           │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ (if AUTHORIZED)
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  CO-SIGNER (Rust HTTP Service)                                   │
-│  ─────────────────────────────                                   │
-│  • Verifies the proof matches the expected model                │
-│  • Checks model output == AUTHORIZED                            │
-│  • Signs approval with nonce (replay protection)                │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ (if proof valid)
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  WDK TRANSFER                                                    │
-│  ────────────                                                    │
-│  • account.transfer() executes normally                         │
-│  • Transaction lands on-chain                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+Runs two scenarios: low-risk (AUTHORIZED, transfer executes) and high-risk (DENIED, transfer blocked).
 
 ## Integration Example
 
 ```typescript
 import { gatedTransfer } from "./gated-transfer";
 
-// Instead of calling account.transfer() directly...
+// Drop-in replacement for account.transfer() in any WDK wallet
 const result = await gatedTransfer(
   {
-    budget: 15,      // User's remaining budget tier
-    trust: 7,        // Trust score (0-10)
-    amount: 3,       // Amount category
-    category: 0,     // Spending category
-    velocity: 2,     // Recent transaction velocity
-    day: 1,          // Day of week
-    time: 1,         // Time of day bucket
+    budget: 15,      // User's remaining budget tier (0-15)
+    trust: 7,        // Trust score (0-7)
+    amount: 3,       // Amount category (0-15)
+    category: 0,     // Spending category (0-3)
+    velocity: 2,     // Recent transaction velocity (0-7)
+    day: 1,          // Day of week (0-7)
+    time: 1,         // Time of day bucket (0-3)
   },
   recipientAddress,
-  "100000000", // 100 USDT (6 decimals)
+  "100000000", // 100 USDT0 (6 decimals)
   config,
   executeTransfer  // Your WDK transfer function
 );
@@ -142,25 +165,34 @@ if (result.success) {
 }
 ```
 
-## Verified on Sepolia
-
-Real transactions executed through this system:
-
-| Type | Address/Hash |
-|------|--------------|
-| **Token Contract** | [0x959413cfD31eBe4Bc81A57b284cD638b4Be88500](https://sepolia.etherscan.io/address/0x959413cfD31eBe4Bc81A57b284cD638b4Be88500) |
-| **Example Transfer** | [0x39f5669338276e54f2491ec521409d11b15cf56a25589d747e518cd5be18b913](https://sepolia.etherscan.io/tx/0x39f5669338276e54f2491ec521409d11b15cf56a25589d747e518cd5be18b913) |
-
 ## Project Structure
 
 ```
-├── client/          # TypeScript SDK - orchestrates the flow
-├── prover/          # Rust CLI - generates zkML proofs
-├── cosigner/        # Rust HTTP service - verifies proofs
-├── contracts/       # Solidity - test token (Foundry)
-├── models/          # ONNX model + vocabulary
-└── demo/            # Browser visualization
+├── client/              # TypeScript SDK - orchestrates the gated transfer flow
+├── prover/              # Rust CLI - generates zkML proofs via Jolt zkVM
+├── cosigner/            # Rust HTTP service - verifies SNARK proofs
+├── contracts/           # Solidity - test token (Foundry)
+├── models/              # ONNX model + vocabulary
+├── demo/                # Browser visualization
+└── x402-jolt-usdt0/     # x402 payment protocol + zkML on Plasma
+    ├── x402/            #   Express server, client, facilitator, middleware
+    ├── zk/              #   Proof binding, caching, prover/cosigner bridges
+    ├── wdk/             #   WDK wallet adapter + proof-gated decorator
+    ├── demo/            #   React dashboard (SSE timeline) + MCP server
+    ├── a2a/             #   A2A AgentCard + task handler
+    ├── cache/           #   Pre-generated proof cache
+    └── scripts/         #   Wallet funding helper
 ```
+
+## How the Proof Works
+
+1. **Model hash verification** — Both prover and cosigner compute SHA256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
+
+2. **SNARK proof** — Jolt generates a proof that the model execution was correct. The cosigner verifies this against pre-computed verification parameters.
+
+3. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
+
+4. **Replay protection** — Each approval includes a monotonic nonce. The same proof can't be reused.
 
 ## Technical Details
 
@@ -177,11 +209,15 @@ Copy `.env.example` to `.env`:
 
 | Variable | Description |
 |----------|-------------|
-| `SEED_PHRASE` | BIP-39 mnemonic for WDK wallet |
+| `MNEMONIC` | BIP-39 mnemonic for x402 client wallet (Plasma) |
+| `PAY_TO_ADDRESS` | Server wallet address that receives USDT0 payments |
+| `COSIGNER_PRIVATE_KEY` | Hex private key for cosigner (no 0x prefix) |
+| `COSIGNER_URL` | Cosigner endpoint (default: `http://localhost:3001`) |
+| `SEED_PHRASE` | BIP-39 mnemonic for WDK wallet (Sepolia client SDK) |
 | `SEPOLIA_RPC_URL` | Ethereum Sepolia RPC endpoint |
-| `TEST_USDT_ADDRESS` | Deployed test token address |
-| `COSIGNER_URL` | Co-signer endpoint (default: `http://localhost:3001`) |
-| `COSIGNER_PRIVATE_KEY` | Hex private key for co-signer |
+| `TEST_USDT_ADDRESS` | Deployed test token address (Sepolia) |
+
+See `x402-jolt-usdt0/.env.example` for the full list of x402-specific variables.
 
 ### Running Tests
 
@@ -189,8 +225,12 @@ Copy `.env.example` to `.env`:
 # Contract tests
 cd contracts && make test
 
-# Client tests
-cd client && npm test
+# Rust tests (prover + cosigner)
+cd prover && cargo test
+cd cosigner && cargo test
+
+# Client build
+cd client && npm run build
 ```
 
 ### Docker Deployment
@@ -200,21 +240,23 @@ docker compose up -d cosigner
 docker compose logs -f cosigner
 ```
 
-## How the Proof Works
+## Verified on Sepolia
 
-1. **Model hash verification** - Both prover and co-signer compute SHA256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
+Real transactions executed through this system:
 
-2. **SNARK proof** - Jolt generates a proof that the model execution was correct. The co-signer verifies this proof against pre-computed verification parameters.
-
-3. **Output check** - The proof includes the model's output. The co-signer confirms the output class is "AUTHORIZED" (class 0).
-
-4. **Replay protection** - Each approval includes a monotonic nonce. The same proof can't be reused.
+| Type | Address/Hash |
+|------|--------------|
+| **Token Contract** | [0x959413cfD31eBe4Bc81A57b284cD638b4Be88500](https://sepolia.etherscan.io/address/0x959413cfD31eBe4Bc81A57b284cD638b4Be88500) |
+| **Example Transfer** | [0x39f5669338276e54f2491ec521409d11b15cf56a25589d747e518cd5be18b913](https://sepolia.etherscan.io/tx/0x39f5669338276e54f2491ec521409d11b15cf56a25589d747e518cd5be18b913) |
 
 ## Built With
 
-- [Tether WDK](https://docs.wallet.tether.io) - Self-custodial wallet SDK
-- [Jolt](https://github.com/a16z/jolt) - High-performance zkVM from a16z
-- [ONNX](https://onnx.ai) - ML model format
+- [Tether WDK](https://docs.wallet.tether.io) — Self-custodial wallet SDK
+- [USDT0](https://usdt0.to) — Omnichain USDT via LayerZero
+- [Plasma](https://www.plasma.to) — Tether's L1 (chain ID 9745)
+- [x402](https://www.x402.org/) — HTTP-native payment protocol
+- [Jolt](https://github.com/a16z/jolt) — High-performance zkVM from a16z
+- [ONNX](https://onnx.ai) — ML model format
 
 ## License
 

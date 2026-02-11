@@ -84,8 +84,6 @@ jobs:
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
-    # Note: Full build/test requires jolt-atlas sibling dependency.
-    # This job runs unit tests that don't require the full zkML stack.
 
     steps:
       - uses: actions/checkout@v4
@@ -102,10 +100,13 @@ jobs:
 
       - name: Run prover tests
         working-directory: prover
-        run: cargo test
+        # May fail if jolt-atlas sibling repo is not checked out alongside this repo.
+        # The zkML SNARK crates depend on jolt-atlas via relative path deps.
         continue-on-error: true
+        run: cargo test
 
       - name: Run cosigner tests
         working-directory: cosigner
-        run: cargo test
+        # May fail if jolt-atlas sibling repo is not checked out alongside this repo.
         continue-on-error: true
+        run: cargo test

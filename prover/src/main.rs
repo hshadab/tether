@@ -76,21 +76,21 @@ fn build_input_vector(features: &InputFeatures, vocab: &HashMap<String, usize>) 
     vec
 }
 
-/// Validate that all feature values are within a reasonable range (0..=64).
+/// Validate that all feature values are within valid ranges matching models/vocab.json.
 fn validate_features(features: &InputFeatures) -> Result<(), String> {
-    let checks = [
-        ("budget", features.budget),
-        ("trust", features.trust),
-        ("amount", features.amount),
-        ("category", features.category),
-        ("velocity", features.velocity),
-        ("day", features.day),
-        ("time", features.time),
+    let checks: [(&str, usize, usize); 7] = [
+        ("budget", features.budget, 15),
+        ("trust", features.trust, 7),
+        ("amount", features.amount, 15),
+        ("category", features.category, 3),
+        ("velocity", features.velocity, 7),
+        ("day", features.day, 7),
+        ("time", features.time, 3),
     ];
-    for (name, val) in checks {
-        if val > 64 {
+    for (name, val, max) in checks {
+        if val > max {
             return Err(format!(
-                "Feature '{name}' value {val} out of range (0..=64)"
+                "Feature '{name}' value {val} out of range (0..={max})"
             ));
         }
     }
@@ -98,6 +98,8 @@ fn validate_features(features: &InputFeatures) -> Result<(), String> {
 }
 
 /// Compute SHA256 hash of a file, returned as hex string.
+// NOTE: Duplicate of sha256_file in cosigner/src/main.rs.
+// Workspace extraction deferred because jolt-atlas path deps make shared crates complex.
 fn sha256_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
@@ -286,7 +288,7 @@ mod tests {
     #[test]
     fn test_validate_features_out_of_range() {
         let f = InputFeatures {
-            budget: 100,
+            budget: 16,
             trust: 7,
             amount: 8,
             category: 0,
@@ -295,5 +297,73 @@ mod tests {
             time: 1,
         };
         assert!(validate_features(&f).is_err());
+    }
+
+    #[test]
+    fn test_validate_features_category_boundary() {
+        // category=3 is the max valid value
+        let ok = InputFeatures {
+            budget: 0,
+            trust: 0,
+            amount: 0,
+            category: 3,
+            velocity: 0,
+            day: 0,
+            time: 0,
+        };
+        assert!(validate_features(&ok).is_ok());
+
+        // category=4 should fail
+        let bad = InputFeatures {
+            budget: 0,
+            trust: 0,
+            amount: 0,
+            category: 4,
+            velocity: 0,
+            day: 0,
+            time: 0,
+        };
+        assert!(validate_features(&bad).is_err());
+    }
+
+    #[test]
+    fn test_validate_features_time_boundary() {
+        // time=3 is the max valid value
+        let ok = InputFeatures {
+            budget: 0,
+            trust: 0,
+            amount: 0,
+            category: 0,
+            velocity: 0,
+            day: 0,
+            time: 3,
+        };
+        assert!(validate_features(&ok).is_ok());
+
+        // time=4 should fail
+        let bad = InputFeatures {
+            budget: 0,
+            trust: 0,
+            amount: 0,
+            category: 0,
+            velocity: 0,
+            day: 0,
+            time: 4,
+        };
+        assert!(validate_features(&bad).is_err());
+    }
+
+    #[test]
+    fn test_validate_features_all_at_max() {
+        let f = InputFeatures {
+            budget: 15,
+            trust: 7,
+            amount: 15,
+            category: 3,
+            velocity: 7,
+            day: 7,
+            time: 3,
+        };
+        assert!(validate_features(&f).is_ok());
     }
 }
