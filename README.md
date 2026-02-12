@@ -46,11 +46,22 @@ User initiates 100 USDT0 transfer via WDK
          │                   │
          ▼                   ▼
 ┌──────────────────┐  ┌──────────────────┐
-│  CO-SIGNER       │  │  TRANSFER        │
-│  Verifies proof  │  │  BLOCKED         │
-│  Signs approval  │  │  Funds stay put  │
-└────────┬─────────┘  └──────────────────┘
-         │
+│  CHECK 1:        │  │  TRANSFER        │
+│  BINDING         │  │  BLOCKED         │
+│  SHA-256 match   │  │  Funds stay put  │
+│  of payment      │  └──────────────────┘
+│  params?         │
+└────────┬─────────┘
+         │ ✓
+         ▼
+┌──────────────────┐
+│  CHECK 2:        │
+│  SNARK VERIFY    │
+│  Cosigner        │
+│  confirms proof  │
+│  is valid        │
+└────────┬─────────┘
+         │ ✓
          ▼
 ┌──────────────────┐
 │  WDK TRANSFER    │
@@ -60,7 +71,7 @@ User initiates 100 USDT0 transfer via WDK
 └──────────────────┘
 ```
 
-Without a valid proof from the correct model, the cosigner won't sign and the WDK transfer can't execute. The spending guardrail is trustless and cryptographically verifiable — users verify the proof themselves rather than trusting a server's word.
+Every payment goes through two independent verification checks. **Check 1 (Binding):** The server recomputes SHA-256 over the payment parameters and compares it to the hash in the proof — catching tampered amounts or recipients before the expensive cryptographic check. **Check 2 (SNARK verification):** The cosigner verifies the Jolt-Atlas SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction — preventing forged proofs. Both checks must pass for the transfer to execute.
 
 ## x402 Demo: Proof-Gated Payments in USDT0
 
@@ -76,13 +87,11 @@ A weather API charges a tiny fee per request. Instead of an API key, the client 
 
 3. **Client signs the USDT0 payment** via WDK and retries the request with both the payment signature and ZK proof attached as HTTP headers.
 
-4. **Server checks two gates:**
-   - **Payment gate:** Is the USDT0 payment signature valid?
-   - **Spending guardrail gate:** Does the ZK proof binding match these exact payment parameters? If an attacker changes the amount from 0.0001 to 10 USDT0, the SHA-256 binding hash won't match — the guardrail rejects it before anything hits Plasma.
+4. **Check 1 — Binding: Does this proof belong to this payment?** The server recomputes SHA-256 over `amount|payTo|chainId|token|proofHash` and compares it to the hash in the proof. If an attacker changes the amount from 0.0001 to 10 USDT0, the hashes diverge — 403 rejected instantly, before the expensive cryptographic check.
 
-5. **Cosigner verifies the SNARK** — confirming the ML model genuinely ran and approved.
+5. **Check 2 — SNARK verification: Did the ML model actually run?** The cosigner (independent Rust verifier) checks the Jolt-Atlas SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction. This prevents forged proofs.
 
-6. **Weather data returned.** Payment settles in USDT0 on Plasma.
+6. **Both checks pass → settlement.** Weather data returned. Payment settles in USDT0 on Plasma.
 
 The demo includes three scenarios:
 - **Normal flow** — proof and payment match, 200 OK
@@ -190,13 +199,15 @@ if (result.success) {
 
 ## How the Proof Works
 
-1. **Model hash verification** — Both prover and cosigner compute SHA256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
+1. **Binding check (Check 1)** — The server recomputes SHA-256 over `amount|payTo|chainId|token|proofHash` and compares it to the hash in the proof. If any parameter was tampered with, the hashes diverge and the payment is rejected instantly — before any cryptographic verification.
 
-2. **SNARK proof** — Jolt-Atlas generates a proof that the model execution was correct. The cosigner verifies this against pre-computed verification parameters.
+2. **Model hash verification** — Both prover and cosigner compute SHA-256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
 
-3. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
+3. **SNARK verification (Check 2)** — Jolt-Atlas generates a proof that the model execution was correct. The cosigner verifies this against pre-computed verification parameters. This confirms the ML model genuinely ran inside the zkVM.
 
-4. **Replay protection** — Each approval includes a monotonic nonce. The same proof can't be reused.
+4. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
+
+5. **Replay protection** — Each approval includes a monotonic nonce. The same proof can't be reused.
 
 ## Technical Details
 

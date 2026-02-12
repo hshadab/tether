@@ -42,27 +42,27 @@ Agent                          Server                        Cosigner (Rust)
   |<-- 200 + weather data --     |                              |
 ```
 
-Two gates must pass: (1) payment signature is valid, (2) agent spending policy — ZK proof binding matches payment parameters. If either fails, the agent's request is rejected.
+Two verification checks must pass before any payment settles. If either fails, the agent's request is rejected.
 
 ## How It Works (Plain English)
 
-A weather API charges a tiny fee (0.0001 USDT0) for every request using the HTTP 402 payment protocol. An AI agent pays autonomously, but every payment must pass through a cryptographically verified spending guardrail — a cryptographic proof that an ML model evaluated the agent's transaction against spending policy, verifiable by anyone without trusting the server.
+A weather API charges a tiny fee (0.0001 USDT0) for every request using the HTTP 402 payment protocol. An AI agent pays autonomously, but every payment must pass two independent verification checks — one to confirm the proof belongs to this specific payment, and one to confirm the ML model actually ran.
 
 Here's what happens:
 
 1. **Agent asks for weather data.** The server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
 
-2. **Agent generates a live zkML proof.** The [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover runs an ONNX ML model that evaluates the agent's spending policy (~6s on first run, cached for subsequent scenarios). It says "the model evaluated the agent's spending policy and said AUTHORIZED." Critically, the proof is cryptographically bound to the exact payment parameters — the amount, recipient, chain, and token. Change any of these and the proof becomes invalid.
+2. **Agent generates a live zkML proof.** The [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover runs an ONNX ML model that evaluates the agent's spending policy (~6s on first run, cached for subsequent scenarios). The prover produces two things: a SNARK proof that the model ran and output AUTHORIZED, and a SHA-256 binding hash that locks this proof to the exact payment parameters (amount, recipient, chain, token).
 
-3. **Agent signs a payment and retries the request,** attaching both the payment signature and the ZK proof as HTTP headers (`X-Payment` and `X-ZK-Proof`).
+3. **Agent signs a payment and retries the request,** attaching both the payment signature and the ZK proof (with its binding hash) as HTTP headers (`X-Payment` and `X-ZK-Proof`).
 
-4. **The server checks two gates:**
-   - **Gate 1 (payment):** Is the payment signature valid and for the right amount?
-   - **Gate 2 (agent spending policy):** Does the ZK proof binding match these exact payment parameters? The server recomputes a SHA-256 hash over the payment details and compares it to the hash embedded in the proof. If a compromised API inflates the price from 0.0001 to 10 USDT0, the hashes won't match — the cryptographic guardrail rejects the payment before anything touches the blockchain.
+4. **Check 1 — Binding: Does this proof belong to this payment?** The server recomputes SHA-256(amount|payTo|chainId|token|proofHash) and compares it to the hash embedded in the proof. If a compromised API inflates the price from 0.0001 to 10 USDT0, the hashes diverge — the payment is rejected instantly before the expensive SNARK check. This catches tampered amounts, redirected recipients, or switched tokens/chains.
 
-5. **If both gates pass,** the server forwards the proof to the cosigner (a Rust zkML verifier) for deeper verification that the ML model genuinely ran and approved.
+5. **Check 2 — SNARK verification: Did the ML model actually run?** The cosigner (an independent Rust verifier) checks the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction. This prevents forged proofs — you can't fake a valid SNARK without actually running the model.
 
-6. **Only then does the server return the weather data to the agent.**
+6. **Both checks pass → settlement.** The facilitator submits a `transferWithAuthorization` (EIP-3009) on USDT0. Funds move on Plasma, and the agent receives the weather data.
+
+**Why two checks?** The SNARK proof proves the ML model ran and said AUTHORIZED, but it doesn't know what amount or recipient the payment is for. The binding hash is what ties the proof to specific payment parameters. Without it, an attacker could reuse a valid proof with an inflated amount. Without the SNARK check, anyone could fabricate a binding hash without running the model. Both are needed.
 
 The demo runs three scenarios to show the cryptographic guardrail protecting agent payments: a normal flow (agent pays within policy, succeeds), a tampered amount (compromised API inflates price, rejected), and a tampered recipient (man-in-the-middle redirects payment, rejected). A React dashboard visualizes every step in real-time.
 
@@ -353,7 +353,9 @@ Provides a `get-weather` tool that handles the full x402 + ZK proof flow.
 
 ## How the Cryptographic Guardrail Works
 
-The agent spending policy is enforced as a SHA-256 binding hash over `amount|payTo|chainId|token|proofHash`. Both the agent and server compute this independently — making verification trustless.
+Every payment goes through two independent verification checks:
+
+**Check 1 — Binding (server middleware):** Does this proof belong to this payment? The server recomputes SHA-256 over `amount|payTo|chainId|token|proofHash` and compares it to the hash in the proof. If any parameter was tampered with, the hashes diverge and the payment is rejected instantly — before the expensive SNARK check.
 
 ```
 Agent generates proof for:           Agent sends payment for:
@@ -371,7 +373,11 @@ Proof binding:                       Payment header:
   → 403 Forbidden: "Amount mismatch: proof bound to 100, payment requests 10000000"
 ```
 
-The cryptographic guardrail catches this before the cosigner is ever contacted — the agent's payment is blocked.
+Check 1 catches this before the cosigner is ever contacted — the agent's payment is blocked.
+
+**Check 2 — SNARK verification (cosigner):** Did the ML model actually run? Only if Check 1 passes, the middleware forwards the SNARK proof to the cosigner — an independent Rust verifier that confirms the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) proof is valid and the model genuinely executed inside the zkVM. This prevents forged proofs.
+
+Both checks are needed: the binding prevents proof reuse with different payment parameters, while the SNARK verification prevents fabrication of proofs without running the model.
 
 ## Network Configuration
 
