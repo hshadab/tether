@@ -2,7 +2,7 @@
 
 > Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 payment demo on Plasma — by adding a cryptographically verifiable spending guardrail to the payment path. Where the original demonstrates x402 payments with WDK + USDT0, this PoC adds a ZK proof that an ML guardrail model authorized every transaction for these exact parameters — making the payment rail tamper-evident and auditable without trusting any single party.
 
-**Spending guardrails as a first-class primitive on the Tether stack.** This project integrates zkML verification natively into the [Tether WDK](https://docs.wallet.tether.io) payment path, settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to).
+**Cryptographic spending guardrails as a first-class primitive on the Tether stack.** This project integrates zkML verification natively into the [Tether WDK](https://docs.wallet.tether.io) payment path, settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to).
 
 Every piece of this system is built directly on Tether primitives:
 

@@ -437,7 +437,7 @@ function renderCard(c, proofHex) {
   if (c.type === 'welcome') {
     return (
       <div style={S.welcomeCard}>
-        <h1 style={S.welcomeTitle}>Spending Guardrails as a First-Class Primitive</h1>
+        <h1 style={S.welcomeTitle}>Cryptographic Spending Guardrails as a First-Class Primitive</h1>
         <p style={S.welcomeText}>
           Every autonomous agent payment is verified by a zero knowledge machine learning (zkML) proof that provides a tamperproof spending guardrail. The proof is bound to exact payment parameters — change any field and the guardrail rejects it.
         </p>
