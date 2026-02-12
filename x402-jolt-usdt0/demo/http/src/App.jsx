@@ -468,10 +468,10 @@ function renderCard(c, proofHex) {
         <div style={S.ovFlow}>
           {[
             { num:'1', title:'Agent requests data', desc:'The agent calls GET /weather — the API replies HTTP 402 Payment Required with USDT0 price and recipient address.', color:'#3b82f6' },
-            { num:'2', title:'Agent generates a zkML proof via Jolt-Atlas (ICME Labs)', desc:'The Jolt-Atlas zkVM runs an ONNX ML model that evaluates agent spending policy and produces a zkML proof that the model executed correctly and output AUTHORIZED. A SHA-256 binding hash locks this proof to the exact payment parameters (amount, recipient, chain, token).', color:'#8b5cf6' },
+            { num:'2', title:'Agent generates a zkML proof via Jolt-Atlas (ICME Labs)', desc:'The zkML prover runs an ML guardrail model that evaluates agent spending policy and produces a zkML proof that the model executed correctly and output AUTHORIZED. A SHA-256 binding hash locks this proof to the exact payment parameters (amount, recipient, chain, token).', color:'#8b5cf6' },
             { num:'3', title:'Agent retries with payment + proof', desc:'HTTP headers carry both the signed USDT0 payment (X-Payment) and the zkML proof with its binding hash (X-ZK-Proof). The agent pays autonomously.', color:'#50AF95' },
             { num:'4', title:'Binding check: does this proof belong to this payment?', desc:'The server recomputes SHA-256(amount|payTo|chainId|token|proofHash) and compares it to the hash in the proof. If any parameter was tampered with, the hashes diverge \u2192 403 rejected instantly. This is cheap and catches attacks before the expensive proof check.', color:'#f59e0b' },
-            { num:'5', title:'Proof verification: did the ML model run correctly?', desc:'The cosigner (independent Rust verifier) checks the zkML proof to confirm the ML model executed correctly inside the zkVM and approved the transaction. This prevents forged proofs — you can\u2019t fake a valid proof without running the model.', color:'#06b6d4' },
+            { num:'5', title:'Guardrail verification: did the ML model run correctly?', desc:'The cosigner (independent Rust verifier) checks the zkML proof to confirm the ML guardrail model executed correctly and approved the transaction. This prevents guardrails from being forged — you can\u2019t fake a valid proof without running the model.', color:'#06b6d4' },
             { num:'6', title:'USDT0 settlement on Plasma', desc:'Both checks pass \u2192 the facilitator submits a transferWithAuthorization (EIP-3009) call on USDT0. Funds move on-chain, and the agent receives the data.', color:'#50AF95' },
           ].map((step,i) => (
             <div key={i} style={{...S.ovStep, animation:`slide-in 0.5s ease-out ${i*0.15}s both`}}>
@@ -576,9 +576,9 @@ function renderCard(c, proofHex) {
               <div style={{...S.conLn,animationDelay:'0.9s'}}><span style={S.conArrIn}>{'\u2190'}</span><span style={S.conD}>Recompute SHA-256(amount | payTo | chainId | token | proofHash)</span></div>
               <div style={{...S.conLn,animationDelay:'1.4s'}}><span style={S.conArrIn}>{'\u2190'}</span><span style={S.conD}>Compare proof.binding_hash === computed_hash</span></div>
               <div style={{...S.conLn,animationDelay:'1.9s'}}><span style={S.conArrOut}>{'\u2192'}</span><span style={S.conDRes}>If mismatch → 403 (payment tampered, reject before proof check)</span></div>
-              <div style={{...S.conLn,animationDelay:'2.6s'}}><span style={{color:'#06b6d4',fontWeight:700,flexShrink:0,fontSize:'0.56rem'}}>CHECK 2</span><span style={S.conD}> Proof — did the ML model run correctly and approve?</span></div>
+              <div style={{...S.conLn,animationDelay:'2.6s'}}><span style={{color:'#06b6d4',fontWeight:700,flexShrink:0,fontSize:'0.56rem'}}>CHECK 2</span><span style={S.conD}> Guardrail — did the ML model run correctly and approve?</span></div>
               <div style={{...S.conLn,animationDelay:'3.1s'}}><span style={{...S.conM,...S.conMPost}}>POST</span><span style={S.conU}>localhost:3001/verify  [forward to cosigner]</span></div>
-              <div style={{...S.conLn,animationDelay:'3.6s'}}><span style={S.conArrOut}>{'\u2192'}</span><span style={S.conDRes}>Cosigner verifies correct ML execution (prevents forged proofs)</span></div>
+              <div style={{...S.conLn,animationDelay:'3.6s'}}><span style={S.conArrOut}>{'\u2192'}</span><span style={S.conDRes}>Cosigner verifies correct guardrail execution (prevents forged guardrails)</span></div>
             </div>
           </div>
         )}

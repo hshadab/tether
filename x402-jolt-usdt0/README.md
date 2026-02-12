@@ -1,6 +1,6 @@
 # ZK-402: No Proof, No Payment
 
-> Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 + WDK + USDT0 payment demo on Plasma — by adding a cryptographically verified spending guardrail to the payment path. x402 enables agents to pay for APIs with USDT0. This project adds the missing trust layer — cryptographic proof that every autonomous agent payment was evaluated and authorized by an ML model, verifiable by anyone.
+> Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 + WDK + USDT0 payment demo on Plasma — by adding a cryptographically verified spending guardrail to the payment path. x402 enables agents to pay for APIs with USDT0. This project adds the missing trust layer — cryptographic proof that every autonomous agent payment was evaluated and authorized by an ML guardrail model, verifiable by anyone.
 
 Trustless agentic commerce with cryptographically verified spending guardrails for USDT0 on [Plasma](https://www.plasma.to).
 
@@ -46,23 +46,23 @@ Two verification checks must pass before any payment settles. If either fails, t
 
 ## How It Works (Plain English)
 
-A weather API charges a tiny fee (0.0001 USDT0) for every request using the HTTP 402 payment protocol. An AI agent pays autonomously, but every payment must pass two independent verification checks — one to confirm the proof belongs to this specific payment, and one to confirm the ML model actually ran.
+A weather API charges a tiny fee (0.0001 USDT0) for every request using the HTTP 402 payment protocol. An AI agent pays autonomously, but every payment must pass two independent verification checks — one to confirm the proof belongs to this specific payment, and one to confirm the ML guardrail model actually ran correctly.
 
 Here's what happens:
 
 1. **Agent asks for weather data.** The server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
 
-2. **Agent generates a live zkML proof.** The [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover runs an ONNX ML model that evaluates the agent's spending policy (~6s on first run, cached for subsequent scenarios). The prover produces two things: a zkML proof that the model executed correctly and output AUTHORIZED, and a SHA-256 binding hash that locks this proof to the exact payment parameters (amount, recipient, chain, token).
+2. **Agent generates a live zkML proof.** The [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover runs an ML guardrail model that evaluates the agent's spending policy (~6s on first run, cached for subsequent scenarios). The prover produces two things: a zkML proof that the model executed correctly and output AUTHORIZED, and a SHA-256 binding hash that locks this proof to the exact payment parameters (amount, recipient, chain, token).
 
 3. **Agent signs a payment and retries the request,** attaching both the payment signature and the ZK proof (with its binding hash) as HTTP headers (`X-Payment` and `X-ZK-Proof`).
 
 4. **Check 1 — Binding: Does this proof belong to this payment?** The server recomputes SHA-256(amount|payTo|chainId|token|proofHash) and compares it to the hash embedded in the proof. If a compromised API inflates the price from 0.0001 to 10 USDT0, the hashes diverge — the payment is rejected instantly before the expensive proof check. This catches tampered amounts, redirected recipients, or switched tokens/chains.
 
-5. **Check 2 — proof verification: Did the ML model run correctly?** The cosigner (an independent Rust verifier) checks the zkML proof to confirm the ML model executed correctly inside the zkVM and approved the transaction. This prevents forged proofs — you can't fake a valid proof without running the model.
+5. **Check 2 — Guardrail verification: Did the ML model run correctly?** The cosigner (an independent Rust verifier) checks the zkML proof to confirm the ML guardrail model executed correctly and approved the transaction. This prevents guardrails from being forged — you can't fake a valid proof without running the model.
 
 6. **Both checks pass → settlement.** The facilitator submits a `transferWithAuthorization` (EIP-3009) on USDT0. Funds move on Plasma, and the agent receives the weather data.
 
-**Why two checks?** The zkML proof proves the ML model ran correctly and said AUTHORIZED, but it doesn't know what amount or recipient the payment is for. The binding hash is what ties the proof to specific payment parameters. Without it, an attacker could reuse a valid proof with an inflated amount. Without the proof check, anyone could fabricate a binding hash without running the model. Both are needed.
+**Why two checks?** The zkML proof proves the guardrail model ran correctly and said AUTHORIZED, but it doesn't know what amount or recipient the payment is for. The binding hash is what ties the proof to specific payment parameters. Without it, an attacker could reuse a valid proof with an inflated amount. Without the proof check, anyone could fabricate a binding hash without running the model. Both are needed.
 
 The demo runs three scenarios to show the cryptographic guardrail protecting agent payments: a normal flow (agent pays within policy, succeeds), a tampered amount (compromised API inflates price, rejected), and a tampered recipient (man-in-the-middle redirects payment, rejected). A React dashboard visualizes every step in real-time.
 
@@ -84,9 +84,9 @@ Every step in the demo pipeline is real — no simulated delays, no hardcoded ti
 
 | Component | What Happens |
 |-----------|-------------|
-| **Jolt-Atlas zkVM prover** | Real ONNX model runs inside the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM (~6s first run, cached after) |
+| **Jolt-Atlas zkVM prover** | Real ML guardrail model runs inside the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM (~6s first run, cached after) |
 | **HTTP 402 flow** | Real `GET /weather` returns 402, real retry with `X-Payment` + `X-ZK-Proof` headers |
-| **Cosigner verification** | Real Rust verifier confirms correct ML execution |
+| **Cosigner verification** | Real Rust verifier confirms correct guardrail model execution |
 | **SHA-256 binding check** | Real binding recomputation in the middleware |
 | **EIP-3009 settlement** | Real `transferWithAuthorization` on Plasma — watch balances change |
 | **SSE-driven UI** | Dashboard reacts to real server events — no fixed dwells or timers |
@@ -158,7 +158,7 @@ The agent spending policy uses a real trained neural network (not a stub):
 | `day` | 0–7 | Day of week |
 | `time` | 0–3 | Time of day bucket |
 
-The prover runs this model inside a [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM and produces a zkML proof that the model executed correctly and produced AUTHORIZED for the given agent transaction inputs. The cosigner independently verifies the proof against pre-computed verification parameters and confirms the model hash (SHA-256 of the ONNX file) matches.
+The prover runs this guardrail model inside a [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM and produces a zkML proof that the model executed correctly and produced AUTHORIZED for the given agent transaction inputs. The cosigner independently verifies the proof against pre-computed verification parameters and confirms the model hash (SHA-256 of the ONNX file) matches.
 
 ## Prerequisites
 
@@ -375,7 +375,7 @@ Proof binding:                       Payment header:
 
 Check 1 catches this before the cosigner is ever contacted — the agent's payment is blocked.
 
-**Check 2 — proof verification (cosigner):** Did the ML model run correctly? Only if Check 1 passes, the middleware forwards the zkML proof to the cosigner — an independent Rust verifier that confirms the model executed correctly inside the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM. This prevents forged proofs.
+**Check 2 — Guardrail verification (cosigner):** Did the ML guardrail model run correctly? Only if Check 1 passes, the middleware forwards the zkML proof to the cosigner — an independent Rust verifier that confirms the guardrail model executed correctly inside the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM. This prevents guardrails from being forged.
 
 Both checks are needed: the binding prevents proof reuse with different payment parameters, while the proof verification prevents fabrication of proofs without running the model.
 

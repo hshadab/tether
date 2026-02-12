@@ -1,6 +1,6 @@
 # Cryptographically Verifiable Spending Guardrails for USDT0 on Plasma
 
-> Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 payment demo on Plasma — by adding a cryptographically verifiable spending guardrail to the payment path. Where the original demonstrates x402 payments with WDK + USDT0, this PoC adds a ZK proof that an ML model authorized every transaction for these exact parameters — making the payment rail tamper-evident and auditable without trusting any single party.
+> Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 payment demo on Plasma — by adding a cryptographically verifiable spending guardrail to the payment path. Where the original demonstrates x402 payments with WDK + USDT0, this PoC adds a ZK proof that an ML guardrail model authorized every transaction for these exact parameters — making the payment rail tamper-evident and auditable without trusting any single party.
 
 **Trustless, cryptographically verifiable spending guardrails for USDT0.** This project integrates zkML verification natively into the [Tether WDK](https://docs.wallet.tether.io) payment path, settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to).
 
@@ -17,7 +17,7 @@ WDK is the signing and wallet layer. USDT0 is the real payment rail. Plasma is t
 
 ## What This Does
 
-A trustless, cryptographically verifiable spending guardrail that evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. Unlike server-side fraud checks that users have to trust blindly, the ML model runs inside a zero-knowledge VM ([Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation actually happened. Anyone can verify the guardrail ran; no one can forge that it did. No trust required — only math.
+A trustless, cryptographically verifiable spending guardrail that evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. Unlike server-side fraud checks that users have to trust blindly, the ML guardrail model runs inside a zero-knowledge VM ([Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation executed correctly. Anyone can verify the guardrail ran correctly; no one can forge that it did. No trust required — only math.
 
 **WDK integration:** The spending guardrail sits between `gatedTransfer()` and `account.transfer()`. The WDK wallet won't execute the transfer unless the zkML proof is valid and the cosigner has signed off.
 
@@ -59,7 +59,7 @@ User initiates 100 USDT0 transfer via WDK
 │  PROOF VERIFY    │
 │  Cosigner        │
 │  confirms correct│
-│  ML execution    │
+│  guardrail exec  │
 └────────┬─────────┘
          │ ✓
          ▼
@@ -71,7 +71,7 @@ User initiates 100 USDT0 transfer via WDK
 └──────────────────┘
 ```
 
-Every payment goes through two independent verification checks. **Check 1 (Binding):** The server recomputes SHA-256 over the payment parameters and compares it to the hash in the proof — catching tampered amounts or recipients before the expensive cryptographic check. **Check 2 (proof verification):** The cosigner verifies the zkML proof to confirm the ML model executed correctly inside the zkVM and approved the transaction — preventing forged proofs. Both checks must pass for the transfer to execute.
+Every payment goes through two independent verification checks. **Check 1 (Binding):** The server recomputes SHA-256 over the payment parameters and compares it to the hash in the proof — catching tampered amounts or recipients before the expensive cryptographic check. **Check 2 (guardrail verification):** The cosigner verifies the zkML proof to confirm the ML guardrail model executed correctly and approved the transaction — preventing guardrails from being forged. Both checks must pass for the transfer to execute.
 
 ## x402 Demo: Proof-Gated Payments in USDT0
 
@@ -79,7 +79,7 @@ The `x402-jolt-usdt0/` directory demonstrates zkML proofs integrated into the [x
 
 **How it works in plain English:**
 
-A weather API charges a tiny fee per request. Instead of an API key, the client pays per-request using HTTP 402. Every payment must pass through a verifiable spending guardrail — a ZK proof that an ML model approved the transaction for these exact parameters.
+A weather API charges a tiny fee per request. Instead of an API key, the client pays per-request using HTTP 402. Every payment must pass through a verifiable spending guardrail — a ZK proof that an ML guardrail model approved the transaction for these exact parameters.
 
 1. **Client requests weather data.** Server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
 
@@ -89,7 +89,7 @@ A weather API charges a tiny fee per request. Instead of an API key, the client 
 
 4. **Check 1 — Binding: Does this proof belong to this payment?** The server recomputes SHA-256 over `amount|payTo|chainId|token|proofHash` and compares it to the hash in the proof. If an attacker changes the amount from 0.0001 to 10 USDT0, the hashes diverge — 403 rejected instantly, before the expensive cryptographic check.
 
-5. **Check 2 — proof verification: Did the ML model run correctly?** The cosigner (independent Rust verifier) checks the zkML proof to confirm the ML model executed correctly inside the zkVM and approved the transaction. This prevents forged proofs.
+5. **Check 2 — Guardrail verification: Did the ML model run correctly?** The cosigner (independent Rust verifier) checks the zkML proof to confirm the ML guardrail model executed correctly and approved the transaction. This prevents guardrails from being forged.
 
 6. **Both checks pass → settlement.** Weather data returned. Payment settles in USDT0 on Plasma.
 
@@ -203,7 +203,7 @@ if (result.success) {
 
 2. **Model hash verification** — Both prover and cosigner compute SHA-256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
 
-3. **proof verification (Check 2)** — Jolt-Atlas generates a proof of correct ML execution. The cosigner verifies this against pre-computed verification parameters, confirming the model ran correctly inside the zkVM.
+3. **Guardrail verification (Check 2)** — Jolt-Atlas generates a proof of correct guardrail model execution. The cosigner verifies this against pre-computed verification parameters, confirming the guardrail model ran correctly.
 
 4. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
 
@@ -275,7 +275,7 @@ Real transactions executed through this system:
 
 The base this project extends. It implements the standard x402 payment flow on Plasma: client sends a request, server responds 402, client signs an EIP-3009 USDT0 payment via WDK, server verifies and settles on-chain using the official `@x402/*` SDK. Clean baseline — x402 + WDK + USDT0 on Plasma, no additional verification.
 
-**This project rebuilds that payment flow with a trustless spending guardrail as a mandatory gate.** The x402 middleware was reimplemented (rather than wrapping `@x402/express`) because the ZK proof binding check needs to run *inside* the payment verification path, not alongside it. Every payment must carry a cryptographic proof that an ML model approved the transaction for these exact parameters — making the guardrail trustless and verifiable by anyone.
+**This project rebuilds that payment flow with a trustless spending guardrail as a mandatory gate.** The x402 middleware was reimplemented (rather than wrapping `@x402/express`) because the ZK proof binding check needs to run *inside* the payment verification path, not alongside it. Every payment must carry a cryptographic proof that an ML guardrail model approved the transaction for these exact parameters — making the guardrail trustless and verifiable by anyone.
 
 ### [SemanticPay/wdk-wallet-evm-x402-facilitator](https://github.com/SemanticPay/wdk-wallet-evm-x402-facilitator)
 
@@ -293,7 +293,7 @@ The adapter that bridges Tether WDK wallets to the x402 facilitator interface. I
 | Token | USDT0 on Plasma | USDT0 on Plasma |
 | Authorization | Payment signature only | Payment signature + trustless spending guardrail (zkML proof of correct execution) |
 | Tamper detection | None — valid signature = valid payment | Spending guardrail: SHA-256 binding catches tampered amounts/recipients |
-| ML verification | None | Jolt-Atlas zkVM proves the ONNX model ran correctly |
+| ML verification | None | Jolt-Atlas zkVM proves the guardrail model ran correctly |
 | Cosigner | None | Rust proof verifier in the payment path |
 | Attack demos | None | 3 scenarios (normal, tampered amount, tampered recipient) |
 
