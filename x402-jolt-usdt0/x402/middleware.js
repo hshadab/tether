@@ -185,7 +185,7 @@ export function createZk402Middleware(config) {
       broadcast({
         step: 'zkml_proof_verified',
         title: 'Proof Verified',
-        description: 'Cosigner verified the SNARK proof successfully.',
+        description: 'Cosigner verified correct ML execution.',
         actor: 'Cosigner',
         status: 'success',
         details: { nonce: cosignerResult.nonce, signature: cosignerResult.signature?.slice(0, 20) + '...' },
@@ -196,7 +196,7 @@ export function createZk402Middleware(config) {
       broadcast({
         step: 'zkml_proof_verified',
         title: 'Proof Binding Verified (Cosigner Unavailable)',
-        description: 'Proof binding verified locally. Cosigner offline — SNARK check skipped.',
+        description: 'Proof binding verified locally. Cosigner offline — proof check skipped.',
         actor: 'Server',
         status: 'success',
         details: { cosignerError: err.message },

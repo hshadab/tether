@@ -42,7 +42,7 @@ User initiates 100 USDT0 transfer via WDK
          ┌─────────┴─────────┐
          │                   │
     AUTHORIZED            DENIED
-    + SNARK proof         No proof generated
+    + zkML proof          No proof generated
          │                   │
          ▼                   ▼
 ┌──────────────────┐  ┌──────────────────┐
@@ -58,8 +58,8 @@ User initiates 100 USDT0 transfer via WDK
 │  CHECK 2:        │
 │  PROOF VERIFY    │
 │  Cosigner        │
-│  confirms proof  │
-│  is valid        │
+│  confirms correct│
+│  ML execution    │
 └────────┬─────────┘
          │ ✓
          ▼
@@ -71,7 +71,7 @@ User initiates 100 USDT0 transfer via WDK
 └──────────────────┘
 ```
 
-Every payment goes through two independent verification checks. **Check 1 (Binding):** The server recomputes SHA-256 over the payment parameters and compares it to the hash in the proof — catching tampered amounts or recipients before the expensive cryptographic check. **Check 2 (proof verification):** The cosigner verifies the Jolt-Atlas SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction — preventing forged proofs. Both checks must pass for the transfer to execute.
+Every payment goes through two independent verification checks. **Check 1 (Binding):** The server recomputes SHA-256 over the payment parameters and compares it to the hash in the proof — catching tampered amounts or recipients before the expensive cryptographic check. **Check 2 (proof verification):** The cosigner verifies the zkML proof to confirm the ML model executed correctly inside the zkVM and approved the transaction — preventing forged proofs. Both checks must pass for the transfer to execute.
 
 ## x402 Demo: Proof-Gated Payments in USDT0
 
@@ -89,7 +89,7 @@ A weather API charges a tiny fee per request. Instead of an API key, the client 
 
 4. **Check 1 — Binding: Does this proof belong to this payment?** The server recomputes SHA-256 over `amount|payTo|chainId|token|proofHash` and compares it to the hash in the proof. If an attacker changes the amount from 0.0001 to 10 USDT0, the hashes diverge — 403 rejected instantly, before the expensive cryptographic check.
 
-5. **Check 2 — proof verification: Did the ML model actually run?** The cosigner (independent Rust verifier) checks the Jolt-Atlas SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction. This prevents forged proofs.
+5. **Check 2 — proof verification: Did the ML model run correctly?** The cosigner (independent Rust verifier) checks the zkML proof to confirm the ML model executed correctly inside the zkVM and approved the transaction. This prevents forged proofs.
 
 6. **Both checks pass → settlement.** Weather data returned. Payment settles in USDT0 on Plasma.
 
@@ -183,7 +183,7 @@ if (result.success) {
 ```
 ├── client/              # TypeScript SDK - orchestrates the gated transfer flow
 ├── prover/              # Rust CLI - generates zkML proofs via Jolt-Atlas zkVM
-├── cosigner/            # Rust HTTP service - verifies SNARK proofs
+├── cosigner/            # Rust HTTP service - verifies zkML proofs
 ├── contracts/           # Solidity - test token (Foundry)
 ├── models/              # ONNX model + vocabulary
 ├── demo/                # Browser visualization
@@ -203,7 +203,7 @@ if (result.success) {
 
 2. **Model hash verification** — Both prover and cosigner compute SHA-256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
 
-3. **proof verification (Check 2)** — Jolt-Atlas generates a proof that the model execution was correct. The cosigner verifies this against pre-computed verification parameters. This confirms the ML model genuinely ran inside the zkVM.
+3. **proof verification (Check 2)** — Jolt-Atlas generates a proof of correct ML execution. The cosigner verifies this against pre-computed verification parameters, confirming the model ran correctly inside the zkVM.
 
 4. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
 
@@ -291,10 +291,10 @@ The adapter that bridges Tether WDK wallets to the x402 facilitator interface. I
 | Wallet | WDK via [`wdk-wallet-evm-x402-facilitator`](https://github.com/SemanticPay/wdk-wallet-evm-x402-facilitator) | Same `FacilitatorEvmSigner` pattern (ethers.js adapter) |
 | Settlement | EIP-3009 `transferWithAuthorization` | EIP-3009 `transferWithAuthorization` (via `@x402/evm` ABI) |
 | Token | USDT0 on Plasma | USDT0 on Plasma |
-| Authorization | Payment signature only | Payment signature + trustless spending guardrail (SNARK proof of ML execution) |
+| Authorization | Payment signature only | Payment signature + trustless spending guardrail (zkML proof of correct execution) |
 | Tamper detection | None — valid signature = valid payment | Spending guardrail: SHA-256 binding catches tampered amounts/recipients |
 | ML verification | None | Jolt-Atlas zkVM proves the ONNX model ran correctly |
-| Cosigner | None | Rust SNARK verifier in the payment path |
+| Cosigner | None | Rust proof verifier in the payment path |
 | Attack demos | None | 3 scenarios (normal, tampered amount, tampered recipient) |
 
 The goal is to show that a trustless spending guardrail can be a native layer in the payment stack — not an external service, but a cryptographic primitive that makes every USDT0 payment provably authorized without trusting any single party.
