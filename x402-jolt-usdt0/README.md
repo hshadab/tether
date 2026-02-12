@@ -278,7 +278,7 @@ npm run dashboard
 Opens at `http://localhost:5173` with:
 - Autoplay through 3 scenarios (Normal, Tampered Amount, Tampered Recipient)
 - Prominent scenario banner showing current scenario name, description, and expected outcome
-- Live proving card with elapsed timer during real Jolt-Atlas zkVM proof generation
+- Live proving card with elapsed timer during real Jolt-Atlas zkML proof generation
 - Event-driven pipeline visualization (SSE — no hardcoded timers)
 - Side-by-side binding comparison table for attack scenarios
 - Real-time Plasma balance updates

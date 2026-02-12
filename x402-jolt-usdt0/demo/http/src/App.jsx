@@ -448,7 +448,7 @@ function renderCard(c, proofHex) {
           <span style={S.wpill}><b style={{color:'#50AF95'}}>WDK</b> wallet signing</span>
           <span style={S.wpill}><b style={{color:'#50AF95'}}>USDT0</b> payments</span>
           <span style={S.wpill}><b style={{color:'#50AF95'}}>x402</b> HTTP 402</span>
-          <span style={S.wpill}><b style={{color:'#8b5cf6'}}>Jolt-Atlas</b> zkVM proofs</span>
+          <span style={S.wpill}><b style={{color:'#8b5cf6'}}>Jolt-Atlas</b> zkML proofs</span>
         </div>
         {/* model card */}
         <div style={S.modelCard}>
