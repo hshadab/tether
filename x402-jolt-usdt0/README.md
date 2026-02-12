@@ -2,7 +2,7 @@
 
 > Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 + WDK + USDT0 payment demo on Plasma — by adding a cryptographically verified spending guardrail to the payment path. x402 enables agents to pay for APIs with USDT0. This project adds the missing trust layer — cryptographic proof that every autonomous agent payment was evaluated and authorized by an ML guardrail model, verifiable by anyone.
 
-Trustless agentic commerce with cryptographically verified spending guardrails for USDT0 on [Plasma](https://www.plasma.to).
+**Spending guardrails as a first-class primitive on the Tether stack.** Trustless agentic commerce with cryptographically verified spending guardrails for USDT0 on [Plasma](https://www.plasma.to).
 
 x402 lets AI agents pay for APIs autonomously. But autonomous spending creates a trust problem — who ensures the agent stays within policy, doesn't get manipulated, and doesn't overspend? Every HTTP payment is cryptographically bound to a Jolt-Atlas zkML proof that acts as an agent spending policy enforcer. If the proof doesn't match the payment, the cryptographic guardrail rejects it before anything touches the chain — no trust required. Payments settle in [USDT0](https://usdt0.to) on Plasma (chain ID 9745) via EIP-3009 `transferWithAuthorization`. Wallets are managed by [WDK](https://docs.wallet.tether.io). The [x402](https://www.x402.org/) protocol handles the HTTP payment negotiation.
 
