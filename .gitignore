@@ -8,6 +8,7 @@ dist/
 # Generated files
 *.srs
 nonce_state.json
+x402-jolt-usdt0/cache/proofs/
 
 # IDE
 .vscode/

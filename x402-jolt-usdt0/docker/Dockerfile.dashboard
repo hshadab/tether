@@ -1,0 +1,57 @@
+# Stage 1: Build
+FROM node:20 AS build
+
+WORKDIR /app
+COPY demo/http/package.json demo/http/package-lock.json* ./
+RUN npm ci
+COPY demo/http/ ./
+RUN npm run build
+
+# Stage 2: Serve
+FROM nginx:alpine
+
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Nginx config with proxy to server
+RUN cat > /etc/nginx/conf.d/default.conf << 'NGINX'
+server {
+    listen 5173;
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /events {
+        proxy_pass http://server:4020;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+    }
+
+    location /demo {
+        proxy_pass http://server:4020;
+    }
+
+    location /weather {
+        proxy_pass http://server:4020;
+    }
+
+    location /.well-known {
+        proxy_pass http://server:4020;
+    }
+
+    location /a2a {
+        proxy_pass http://server:4020;
+    }
+
+    location /health {
+        proxy_pass http://server:4020;
+    }
+}
+NGINX
+
+EXPOSE 5173

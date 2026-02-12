@@ -1,0 +1,21 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install curl for cosigner bridge
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Copy package files and install
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+# Copy source
+COPY x402/ ./x402/
+COPY zk/ ./zk/
+COPY wdk/ ./wdk/
+COPY a2a/ ./a2a/
+COPY cache/ ./cache/
+
+EXPOSE 4020 4021
+
+CMD ["node", "x402/server.js"]

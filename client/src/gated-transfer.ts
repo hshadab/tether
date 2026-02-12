@@ -1,8 +1,6 @@
-import { execFileSync, execSync } from "child_process";
-import { resolve, dirname, join } from "path";
+import { execFileSync } from "child_process";
+import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { writeFileSync, unlinkSync } from "fs";
-import { tmpdir } from "os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,7 +69,6 @@ export function runProver(
 
 /**
  * Submit proof to the co-signer service for verification.
- * Uses curl internally due to Node.js fetch compatibility issues with large payloads.
  */
 export async function submitToCosigner(
   proof: string,
@@ -90,23 +87,23 @@ export async function submitToCosigner(
   });
   console.log(`[Cosigner] Request body size: ${body.length} bytes`);
 
-  // Write payload to temp file and use curl (Node.js fetch has issues with large payloads)
-  const tmpFile = join(tmpdir(), `cosigner_request_${Date.now()}.json`);
-  writeFileSync(tmpFile, body);
+  const resp = await fetch(`${cosignerUrl}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+    signal: AbortSignal.timeout(120_000),
+  });
 
-  try {
-    const output = execSync(
-      `curl -s -X POST "${cosignerUrl}/verify" -H "Content-Type: application/json" --max-time 120 -d @${tmpFile}`,
-      { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 }
-    );
-    const result: CosignerResponse = JSON.parse(output.trim());
-    console.log(
-      `[Cosigner] Response: approved=${result.approved}${result.reason ? `, reason=${result.reason}` : ""}`
-    );
-    return result;
-  } finally {
-    try { unlinkSync(tmpFile); } catch {}
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Cosigner returned ${resp.status}: ${text}`);
   }
+
+  const result: CosignerResponse = await resp.json();
+  console.log(
+    `[Cosigner] Response: approved=${result.approved}${result.reason ? `, reason=${result.reason}` : ""}`
+  );
+  return result;
 }
 
 /**

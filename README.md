@@ -1,8 +1,8 @@
-# zkML Guardrails for Tether WDK + USDT0 on Plasma
+# Cryptographically Verifiable Spending Guardrails for USDT0 on Plasma
 
-> **Community contribution to the Tether ecosystem.** This project extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 payment demo on Plasma — by adding zero-knowledge ML verification as a core primitive. Where the original demonstrates x402 payments with WDK + USDT0, this PoC adds cryptographic proof that an ML model authorized every transaction, making the payment rail tamper-evident and auditable. Built as a proof of concept for deeper Tether partnership.
+> Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 payment demo on Plasma — by adding a cryptographically verifiable spending guardrail to the payment path. Where the original demonstrates x402 payments with WDK + USDT0, this PoC adds a ZK proof that an ML model authorized every transaction for these exact parameters — making the payment rail tamper-evident and auditable without trusting any single party.
 
-**Zero-knowledge machine learning meets the Tether stack.** This project is a native integration of zkML-powered transaction guardrails into [Tether WDK](https://docs.wallet.tether.io), settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to) — Tether's own chain.
+**Trustless, cryptographically verifiable spending guardrails for USDT0.** This project integrates zkML verification natively into the [Tether WDK](https://docs.wallet.tether.io) payment path, settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to).
 
 Every piece of this system is built directly on Tether primitives:
 
@@ -13,17 +13,17 @@ Every piece of this system is built directly on Tether primitives:
 | **Chain** | [Plasma](https://www.plasma.to) (chain ID 9745) | Where payments settle — Tether's own L1 |
 | **Protocol** | [x402](https://www.x402.org/) | HTTP-native micropayments in USDT0 |
 
-WDK is not a bolt-on — it's the signing and wallet layer. USDT0 is not a placeholder token — it's the real payment rail. Plasma is not a testnet fallback — it's the default network. This is what building on Tether as a first-class primitive looks like.
+WDK is the signing and wallet layer. USDT0 is the real payment rail. Plasma is the default network. The ZK proof is the spending guardrail — cryptographically verifiable by anyone, forgeable by no one. No party can skip the ML check, swap the model, or forge an approval.
 
 ## What This Does
 
-An ML model evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. But unlike server-side fraud checks that users have to trust blindly, the model runs inside a zero-knowledge VM ([Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation actually happened. No one can skip the check, swap the model, or forge an approval.
+A trustless, cryptographically verifiable spending guardrail that evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. Unlike server-side fraud checks that users have to trust blindly, the ML model runs inside a zero-knowledge VM ([Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation actually happened. Anyone can verify the guardrail ran; no one can forge that it did. No trust required — only math.
 
-**The Tether WDK connection:** The guardrails sit between `gatedTransfer()` and `account.transfer()`. The WDK wallet won't execute the transfer unless the zkML proof is valid and the cosigner has signed off. This is native WDK integration — the guardrails use WDK's own signing, key management, and transfer execution.
+**WDK integration:** The spending guardrail sits between `gatedTransfer()` and `account.transfer()`. The WDK wallet won't execute the transfer unless the zkML proof is valid and the cosigner has signed off.
 
-**The USDT0 connection:** Every payment in the x402 demo is denominated in real USDT0. The proof is cryptographically bound to the USDT0 token address, the payment amount, and the recipient — change any of these and the proof becomes invalid. This isn't a wrapped or synthetic token. It's USDT0 on Plasma.
+**USDT0 binding:** Every payment is denominated in real USDT0. The proof is cryptographically bound to the token address, payment amount, and recipient — change any of these and the proof becomes invalid.
 
-**The Plasma connection:** Plasma is the default settlement chain. The x402 server, client, and facilitator all point to `rpc.plasma.to` (chain ID 9745) out of the box. Gas is paid in XPL. No configuration needed to run on Tether's chain.
+**Plasma settlement:** Plasma is the default settlement chain. The x402 server, client, and facilitator all point to `rpc.plasma.to` (chain ID 9745) out of the box. Settlement uses EIP-3009 `transferWithAuthorization` — trustless, non-custodial, and gasless for the payer.
 
 ## How It Protects Funds
 
@@ -60,7 +60,7 @@ User initiates 100 USDT0 transfer via WDK
 └──────────────────┘
 ```
 
-Without a valid proof from the correct model, the cosigner won't sign and the WDK transfer can't execute.
+Without a valid proof from the correct model, the cosigner won't sign and the WDK transfer can't execute. The spending guardrail is trustless and cryptographically verifiable — users verify the proof themselves rather than trusting a server's word.
 
 ## x402 Demo: Proof-Gated Payments in USDT0
 
@@ -68,17 +68,17 @@ The `x402-jolt-usdt0/` directory demonstrates zkML proofs integrated into the [x
 
 **How it works in plain English:**
 
-A weather API charges a tiny fee per request. Instead of an API key, the client pays per-request using HTTP 402. Every payment must include a ZK proof that an ML model approved the transaction.
+A weather API charges a tiny fee per request. Instead of an API key, the client pays per-request using HTTP 402. Every payment must pass through a verifiable spending guardrail — a ZK proof that an ML model approved the transaction for these exact parameters.
 
 1. **Client requests weather data.** Server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
 
-2. **Client loads a ZK proof** pre-generated by the Rust prover (ONNX model running inside Jolt zkVM). The proof is cryptographically bound to the exact payment parameters — amount, recipient, chain ID 9745, and the USDT0 token address.
+2. **Client generates a live zkML proof** via the Jolt zkVM prover (~6s on first run, cached for subsequent scenarios). The proof is cryptographically bound to the exact payment parameters — amount, recipient, chain ID 9745, and the USDT0 token address.
 
 3. **Client signs the USDT0 payment** via WDK and retries the request with both the payment signature and ZK proof attached as HTTP headers.
 
 4. **Server checks two gates:**
    - **Payment gate:** Is the USDT0 payment signature valid?
-   - **Proof binding gate:** Does the ZK proof hash match these exact payment parameters? If an attacker changes the amount from 0.0001 to 10 USDT0, the SHA-256 binding hash won't match — rejected before anything hits Plasma.
+   - **Spending guardrail gate:** Does the ZK proof binding match these exact payment parameters? If an attacker changes the amount from 0.0001 to 10 USDT0, the SHA-256 binding hash won't match — the guardrail rejects it before anything hits Plasma.
 
 5. **Cosigner verifies the SNARK** — confirming the ML model genuinely ran and approved.
 
@@ -86,20 +86,22 @@ A weather API charges a tiny fee per request. Instead of an API key, the client 
 
 The demo includes three scenarios:
 - **Normal flow** — proof and payment match, 200 OK
-- **Tampered amount** — attacker inflates USDT0 amount, 403 rejected at binding check
-- **Tampered recipient** — attacker redirects payment, 403 rejected at binding check
+- **Tampered amount** — attacker inflates USDT0 amount, 403 — spending guardrail rejects
+- **Tampered recipient** — attacker redirects payment, 403 — spending guardrail rejects
 
-A React dashboard visualizes every step in real-time via Server-Sent Events.
+A React dashboard visualizes every step in real-time via Server-Sent Events — the UI is fully event-driven with no hardcoded timers.
+
+**What's real:** Live Jolt prover (~6s), real HTTP 402 flow, real cosigner SNARK verification, real EIP-3009 settlement on Plasma, real-time SSE-driven pipeline.
 
 See [`x402-jolt-usdt0/README.md`](x402-jolt-usdt0/README.md) for full setup and usage.
 
-## Use Cases for Tether WDK Wallets
+## Use Cases for WDK Wallets
 
-- **Fraud prevention** — Block suspicious USDT0 transfers before they leave the WDK wallet. The ML model catches unusual patterns and the proof guarantees the check actually ran.
-- **Spending guardrails** — Enforce budgets, daily limits, and category restrictions on USDT0 transfers. Can't be bypassed — the proof is required.
+- **Fraud prevention** — Block suspicious USDT0 transfers before they leave the wallet. The spending guardrail catches unusual patterns and the proof guarantees the check actually ran.
+- **Budget enforcement** — Enforce spending limits, daily caps, and category restrictions on USDT0 transfers. The guardrail is cryptographically verifiable — can't be bypassed or forged.
 - **Risk-based authorization** — Low-risk USDT0 transfers go through instantly. High-risk ones are blocked. The model decides, the proof ensures it was legitimate.
-- **Auditable compliance** — Every USDT0 transfer carries a verifiable proof. Auditors verify proofs directly instead of trusting logs.
-- **Theft protection** — Even with stolen credentials, the ML guardrails block transfers that don't match normal behavior. The attacker can't forge the proof.
+- **Auditable compliance** — Every USDT0 transfer carries a verifiable proof of ML evaluation. Auditors verify the spending guardrail directly — trustless auditability instead of trusting logs.
+- **Theft protection** — Even with stolen credentials, the spending guardrail blocks transfers that don't match normal behavior. The attacker can't forge the proof.
 
 ## Quick Start
 
@@ -116,7 +118,7 @@ cp .env.example .env   # edit MNEMONIC, PAY_TO_ADDRESS, COSIGNER_PRIVATE_KEY
 npm install
 npm run fund-wallet    # shows address + balances + funding instructions
 
-# 3. Generate proof cache (one-time)
+# 3. (Optional) Pre-warm proof cache — demo generates proofs live if skipped
 npm run generate-cache
 
 # 4. Start the server + dashboard
@@ -231,15 +233,20 @@ cd contracts && make test
 cd prover && cargo test
 cd cosigner && cargo test
 
-# Client build
-cd client && npm run build
+# Client tests
+cd client && npm test
 ```
 
 ### Docker Deployment
 
 ```bash
+# Root docker-compose: cosigner only
 docker compose up -d cosigner
 docker compose logs -f cosigner
+
+# x402 docker-compose: cosigner + server + dashboard
+cd x402-jolt-usdt0
+docker compose up
 ```
 
 ## Verified on Sepolia
@@ -251,32 +258,40 @@ Real transactions executed through this system:
 | **Token Contract** | [0x959413cfD31eBe4Bc81A57b284cD638b4Be88500](https://sepolia.etherscan.io/address/0x959413cfD31eBe4Bc81A57b284cD638b4Be88500) |
 | **Example Transfer** | [0x39f5669338276e54f2491ec521409d11b15cf56a25589d747e518cd5be18b913](https://sepolia.etherscan.io/tx/0x39f5669338276e54f2491ec521409d11b15cf56a25589d747e518cd5be18b913) |
 
-## Relationship to x402-usdt0
+## Relationship to Upstream Projects
 
-This project builds on [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0), which is the reference implementation of x402 payments on Plasma using the official `@x402/*` SDK and WDK packages (`@tetherto/wdk-wallet-evm`, `@semanticpay/wdk-wallet-evm-x402-facilitator`).
+### [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0)
 
-The original demonstrates the complete x402 flow: client sends a request, server responds 402, client signs an EIP-3009 USDT0 payment, server verifies and settles on-chain. It's the foundation — clean x402 + WDK + USDT0 on Plasma.
+The base this project extends. It implements the standard x402 payment flow on Plasma: client sends a request, server responds 402, client signs an EIP-3009 USDT0 payment via WDK, server verifies and settles on-chain using the official `@x402/*` SDK. Clean baseline — x402 + WDK + USDT0 on Plasma, no additional verification.
 
-**This project rebuilds that payment flow with zkML as a mandatory gate.** The x402 middleware was reimplemented (rather than wrapping `@x402/express`) because the ZK proof binding check needs to run *inside* the payment verification path, not alongside it. Every payment must carry a cryptographic proof that an ML model approved the transaction for these exact parameters.
+**This project rebuilds that payment flow with a trustless spending guardrail as a mandatory gate.** The x402 middleware was reimplemented (rather than wrapping `@x402/express`) because the ZK proof binding check needs to run *inside* the payment verification path, not alongside it. Every payment must carry a cryptographic proof that an ML model approved the transaction for these exact parameters — making the guardrail trustless and verifiable by anyone.
 
-**What the zkML layer adds:**
+### [SemanticPay/wdk-wallet-evm-x402-facilitator](https://github.com/SemanticPay/wdk-wallet-evm-x402-facilitator)
 
-| | x402-usdt0 (original) | x402-jolt-usdt0 (this project) |
+The adapter that bridges Tether WDK wallets to the x402 facilitator interface. It wraps `@tetherto/wdk-wallet-evm` (`WalletAccountEvm`) to implement `FacilitatorEvmSigner` from `@x402/evm` — the interface that the x402 settlement layer expects for on-chain operations like `writeContract()`, `sendTransaction()`, and `verifyTypedData()`.
+
+`x402-usdt0` uses this adapter directly. This project follows the same `FacilitatorEvmSigner` pattern in `wdk/facilitator-adapter.js` but implements it with plain ethers.js (since the zkML layer operates independently of the full WDK initialization flow). Settlement uses `eip3009ABI` and `authorizationTypes` from `@x402/evm` to call `transferWithAuthorization` on USDT0.
+
+### What the zkML layer adds
+
+| | x402-usdt0 (base) | x402-jolt-usdt0 (this project) |
 |---|---|---|
 | Payment protocol | x402 via `@x402/*` SDK | x402 reimplemented with proof gates |
-| Wallet | WDK (`@tetherto/wdk-wallet-evm`) | WDK (via ethers adapter) |
+| Wallet | WDK via [`wdk-wallet-evm-x402-facilitator`](https://github.com/SemanticPay/wdk-wallet-evm-x402-facilitator) | Same `FacilitatorEvmSigner` pattern (ethers.js adapter) |
+| Settlement | EIP-3009 `transferWithAuthorization` | EIP-3009 `transferWithAuthorization` (via `@x402/evm` ABI) |
 | Token | USDT0 on Plasma | USDT0 on Plasma |
-| Authorization | Payment signature only | Payment signature + SNARK proof of ML execution |
-| Tamper detection | None — valid signature = valid payment | SHA-256 binding catches tampered amounts/recipients |
+| Authorization | Payment signature only | Payment signature + trustless spending guardrail (SNARK proof of ML execution) |
+| Tamper detection | None — valid signature = valid payment | Spending guardrail: SHA-256 binding catches tampered amounts/recipients |
 | ML verification | None | Jolt zkVM proves the ONNX model ran correctly |
 | Cosigner | None | Rust SNARK verifier in the payment path |
 | Attack demos | None | 3 scenarios (normal, tampered amount, tampered recipient) |
 
-The goal is to show that zkML can be added as a native layer in the Tether payment stack — not as an external service, but as a cryptographic primitive that makes every USDT0 payment provably authorized.
+The goal is to show that a trustless spending guardrail can be a native layer in the payment stack — not an external service, but a cryptographic primitive that makes every USDT0 payment provably authorized without trusting any single party.
 
 ## Built With
 
-- [x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — Reference x402 payment demo this project extends
+- [x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — Reference x402 + WDK + USDT0 payment demo this project extends
+- [wdk-wallet-evm-x402-facilitator](https://github.com/SemanticPay/wdk-wallet-evm-x402-facilitator) — WDK → x402 `FacilitatorEvmSigner` adapter (pattern followed here)
 - [Tether WDK](https://docs.wallet.tether.io) — Self-custodial wallet SDK
 - [USDT0](https://usdt0.to) — Omnichain USDT via LayerZero
 - [Plasma](https://www.plasma.to) — Tether's L1 (chain ID 9745)

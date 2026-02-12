@@ -1,7 +1,3 @@
-import { execSync } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
 import { COSIGNER_URL } from '../x402/config.js';
 
 /**
@@ -24,19 +20,19 @@ export async function verifyCosigner(proofResult, txDetails, modelHash) {
 
   console.log(`[Cosigner] Request body size: ${body.length} bytes`);
 
-  // Write payload to temp file (Node.js fetch has issues with large payloads)
-  const tmpFile = join(tmpdir(), `cosigner_req_${Date.now()}.json`);
-  writeFileSync(tmpFile, body);
+  const resp = await fetch(`${COSIGNER_URL}/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    signal: AbortSignal.timeout(300_000), // 5 minute timeout
+  });
 
-  try {
-    const output = execSync(
-      `curl -s -X POST "${COSIGNER_URL}/verify" -H "Content-Type: application/json" --max-time 300 -d @${tmpFile}`,
-      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
-    );
-    const result = JSON.parse(output.trim());
-    console.log(`[Cosigner] Response: approved=${result.approved}${result.reason ? `, reason=${result.reason}` : ''}`);
-    return result;
-  } finally {
-    try { unlinkSync(tmpFile); } catch {}
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Cosigner returned ${resp.status}: ${text}`);
   }
+
+  const result = await resp.json();
+  console.log(`[Cosigner] Response: approved=${result.approved}${result.reason ? `, reason=${result.reason}` : ''}`);
+  return result;
 }
