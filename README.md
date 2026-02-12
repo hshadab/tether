@@ -296,7 +296,7 @@ The goal is to show that a trustless spending guardrail can be a native layer in
 - [USDT0](https://usdt0.to) — Omnichain USDT via LayerZero
 - [Plasma](https://www.plasma.to) — Tether's L1 (chain ID 9745)
 - [x402](https://www.x402.org/) — HTTP-native payment protocol
-- [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) — zkML prover built on [Jolt](https://github.com/a16z/jolt) (a16z) by ICME Labs
+- [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) — zkML prover by ICME Labs
 - [ONNX](https://onnx.ai) — ML model format
 
 ## License
