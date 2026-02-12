@@ -449,10 +449,7 @@ mod tests {
     async fn test_health_endpoint() {
         use actix_web::test;
 
-        let app = test::init_service(
-            App::new().route("/health", web::get().to(health)),
-        )
-        .await;
+        let app = test::init_service(App::new().route("/health", web::get().to(health))).await;
 
         let req = test::TestRequest::get().uri("/health").to_request();
         let resp = test::call_service(&app, req).await;
