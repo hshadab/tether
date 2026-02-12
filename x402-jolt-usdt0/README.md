@@ -18,7 +18,7 @@ x402 lets AI agents pay for APIs autonomously. But autonomous spending creates a
 
 ## What This Does
 
-Trustless agentic commerce — agents pay for APIs autonomously while every payment is cryptographically verified against spending policy. A weather API charges 0.0001 USDT0 per request using the x402 payment protocol. Every agent payment must pass through a cryptographically verified spending guardrail — an ML model running inside a Jolt zkVM evaluates the transaction against the agent's spending policy and produces a cryptographic proof that the evaluation actually happened. The proof is bound to the payment amount, recipient, Plasma chain ID, and USDT0 token address — change any of these and the cryptographic guardrail rejects the payment.
+Trustless agentic commerce — agents pay for APIs autonomously while every payment is cryptographically verified against spending policy. A weather API charges 0.0001 USDT0 per request using the x402 payment protocol. Every agent payment must pass through a cryptographically verified spending guardrail — an ML model running inside a [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM evaluates the transaction against the agent's spending policy and produces a cryptographic proof that the evaluation actually happened. The proof is bound to the payment amount, recipient, Plasma chain ID, and USDT0 token address — change any of these and the cryptographic guardrail rejects the payment.
 
 ```
 Agent                          Server                        Cosigner (Rust)
@@ -27,7 +27,7 @@ Agent                          Server                        Cosigner (Rust)
   |<-- 402 + requirements --     |                              |
   |                              |                              |
   | [generate zkML proof via     |                              |
-  |  Jolt zkVM (~6s)]            |                              |
+  |  Jolt-Atlas zkVM (~6s)]      |                              |
   | [sign EIP-3009 payment]      |                              |
   |                              |                              |
   |-- GET /weather ---------->   |                              |
@@ -52,7 +52,7 @@ Here's what happens:
 
 1. **Agent asks for weather data.** The server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
 
-2. **Agent generates a live zkML proof.** The Jolt zkVM prover runs an ONNX ML model that evaluates the agent's spending policy (~6s on first run, cached for subsequent scenarios). It says "the model evaluated the agent's spending policy and said AUTHORIZED." Critically, the proof is cryptographically bound to the exact payment parameters — the amount, recipient, chain, and token. Change any of these and the proof becomes invalid.
+2. **Agent generates a live zkML proof.** The [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover runs an ONNX ML model that evaluates the agent's spending policy (~6s on first run, cached for subsequent scenarios). It says "the model evaluated the agent's spending policy and said AUTHORIZED." Critically, the proof is cryptographically bound to the exact payment parameters — the amount, recipient, chain, and token. Change any of these and the proof becomes invalid.
 
 3. **Agent signs a payment and retries the request,** attaching both the payment signature and the ZK proof as HTTP headers (`X-Payment` and `X-ZK-Proof`).
 
@@ -84,7 +84,7 @@ Every step in the demo pipeline is real — no simulated delays, no hardcoded ti
 
 | Component | What Happens |
 |-----------|-------------|
-| **Jolt zkVM prover** | Real ONNX model runs inside the Jolt zkVM (~6s first run, cached after) |
+| **Jolt-Atlas zkVM prover** | Real ONNX model runs inside the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM (~6s first run, cached after) |
 | **HTTP 402 flow** | Real `GET /weather` returns 402, real retry with `X-Payment` + `X-ZK-Proof` headers |
 | **Cosigner verification** | Real Rust SNARK verifier confirms the proof |
 | **SHA-256 binding check** | Real binding recomputation in the middleware |
@@ -158,7 +158,7 @@ The agent spending policy uses a real trained neural network (not a stub):
 | `day` | 0–7 | Day of week |
 | `time` | 0–3 | Time of day bucket |
 
-The prover runs this model inside a Jolt zkVM and produces a zkML proof that the model genuinely executed and produced AUTHORIZED for the given agent transaction inputs. The cosigner independently verifies the proof by checking the zkML proof against pre-computed verification parameters and confirming the model hash (SHA-256 of the ONNX file) matches.
+The prover runs this model inside a [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM and produces a zkML proof that the model genuinely executed and produced AUTHORIZED for the given agent transaction inputs. The cosigner independently verifies the proof by checking the zkML proof against pre-computed verification parameters and confirming the model hash (SHA-256 of the ONNX file) matches.
 
 ## Prerequisites
 
@@ -207,7 +207,7 @@ Edit `.env`:
 
 ### 3. Generate proof cache (optional pre-warming)
 
-The demo generates proofs live via the Jolt zkVM prover (~6s on first scenario, then cached). You can optionally pre-warm the cache to skip the first proof generation:
+The demo generates proofs live via the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover (~6s on first scenario, then cached). You can optionally pre-warm the cache to skip the first proof generation:
 
 ```bash
 npm run generate-cache
@@ -278,7 +278,7 @@ npm run dashboard
 Opens at `http://localhost:5173` with:
 - Autoplay through 3 scenarios (Normal, Tampered Amount, Tampered Recipient)
 - Prominent scenario banner showing current scenario name, description, and expected outcome
-- Live proving card with elapsed timer during real Jolt zkVM proof generation
+- Live proving card with elapsed timer during real Jolt-Atlas zkVM proof generation
 - Event-driven pipeline visualization (SSE — no hardcoded timers)
 - Side-by-side binding comparison table for attack scenarios
 - Real-time Plasma balance updates

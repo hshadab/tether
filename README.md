@@ -17,7 +17,7 @@ WDK is the signing and wallet layer. USDT0 is the real payment rail. Plasma is t
 
 ## What This Does
 
-A trustless, cryptographically verifiable spending guardrail that evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. Unlike server-side fraud checks that users have to trust blindly, the ML model runs inside a zero-knowledge VM ([Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation actually happened. Anyone can verify the guardrail ran; no one can forge that it did. No trust required — only math.
+A trustless, cryptographically verifiable spending guardrail that evaluates every transaction for risk — spending patterns, velocity, trust scores — before it can execute. Unlike server-side fraud checks that users have to trust blindly, the ML model runs inside a zero-knowledge VM ([Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas)), producing a cryptographic proof that the evaluation actually happened. Anyone can verify the guardrail ran; no one can forge that it did. No trust required — only math.
 
 **WDK integration:** The spending guardrail sits between `gatedTransfer()` and `account.transfer()`. The WDK wallet won't execute the transfer unless the zkML proof is valid and the cosigner has signed off.
 
@@ -32,7 +32,7 @@ User initiates 100 USDT0 transfer via WDK
          │
          ▼
 ┌─────────────────────────────────────────────┐
-│  ML MODEL (inside Jolt zkVM)                │
+│  ML MODEL (inside Jolt-Atlas zkVM)           │
 │  Evaluates: budget, trust, velocity,        │
 │  amount, category, time of day              │
 │  Output: AUTHORIZED or DENIED               │
@@ -72,7 +72,7 @@ A weather API charges a tiny fee per request. Instead of an API key, the client 
 
 1. **Client requests weather data.** Server replies "402 Payment Required" — pay 0.0001 USDT0 to this address on Plasma.
 
-2. **Client generates a live zkML proof** via the Jolt zkVM prover (~6s on first run, cached for subsequent scenarios). The proof is cryptographically bound to the exact payment parameters — amount, recipient, chain ID 9745, and the USDT0 token address.
+2. **Client generates a live zkML proof** via the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) zkVM prover (~6s on first run, cached for subsequent scenarios). The proof is cryptographically bound to the exact payment parameters — amount, recipient, chain ID 9745, and the USDT0 token address.
 
 3. **Client signs the USDT0 payment** via WDK and retries the request with both the payment signature and ZK proof attached as HTTP headers.
 
@@ -91,7 +91,7 @@ The demo includes three scenarios:
 
 A React dashboard visualizes every step in real-time via Server-Sent Events — the UI is fully event-driven with no hardcoded timers.
 
-**What's real:** Live Jolt prover (~6s), real HTTP 402 flow, real cosigner SNARK verification, real EIP-3009 settlement on Plasma, real-time SSE-driven pipeline.
+**What's real:** Live Jolt-Atlas prover (~6s), real HTTP 402 flow, real cosigner SNARK verification, real EIP-3009 settlement on Plasma, real-time SSE-driven pipeline.
 
 See [`x402-jolt-usdt0/README.md`](x402-jolt-usdt0/README.md) for full setup and usage.
 
@@ -173,7 +173,7 @@ if (result.success) {
 
 ```
 ├── client/              # TypeScript SDK - orchestrates the gated transfer flow
-├── prover/              # Rust CLI - generates zkML proofs via Jolt zkVM
+├── prover/              # Rust CLI - generates zkML proofs via Jolt-Atlas zkVM
 ├── cosigner/            # Rust HTTP service - verifies SNARK proofs
 ├── contracts/           # Solidity - test token (Foundry)
 ├── models/              # ONNX model + vocabulary
@@ -192,7 +192,7 @@ if (result.success) {
 
 1. **Model hash verification** — Both prover and cosigner compute SHA256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
 
-2. **SNARK proof** — Jolt generates a proof that the model execution was correct. The cosigner verifies this against pre-computed verification parameters.
+2. **SNARK proof** — Jolt-Atlas generates a proof that the model execution was correct. The cosigner verifies this against pre-computed verification parameters.
 
 3. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
 
@@ -205,7 +205,7 @@ if (result.success) {
 - Rust 1.88+ (via `rust-toolchain.toml`)
 - Node.js 20+
 - Foundry (for contracts)
-- [jolt-atlas](https://github.com/a16z/jolt) cloned at `../jolt-atlas/`
+- [jolt-atlas](https://github.com/ICME-Lab/jolt-atlas) cloned at `../jolt-atlas/`
 
 ### Environment Variables
 
@@ -282,7 +282,7 @@ The adapter that bridges Tether WDK wallets to the x402 facilitator interface. I
 | Token | USDT0 on Plasma | USDT0 on Plasma |
 | Authorization | Payment signature only | Payment signature + trustless spending guardrail (SNARK proof of ML execution) |
 | Tamper detection | None — valid signature = valid payment | Spending guardrail: SHA-256 binding catches tampered amounts/recipients |
-| ML verification | None | Jolt zkVM proves the ONNX model ran correctly |
+| ML verification | None | Jolt-Atlas zkVM proves the ONNX model ran correctly |
 | Cosigner | None | Rust SNARK verifier in the payment path |
 | Attack demos | None | 3 scenarios (normal, tampered amount, tampered recipient) |
 
@@ -296,7 +296,7 @@ The goal is to show that a trustless spending guardrail can be a native layer in
 - [USDT0](https://usdt0.to) — Omnichain USDT via LayerZero
 - [Plasma](https://www.plasma.to) — Tether's L1 (chain ID 9745)
 - [x402](https://www.x402.org/) — HTTP-native payment protocol
-- [Jolt](https://github.com/a16z/jolt) — High-performance zkVM from a16z
+- [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) — zkML prover built on [Jolt](https://github.com/a16z/jolt) (a16z) by ICME Labs
 - [ONNX](https://onnx.ai) — ML model format
 
 ## License
