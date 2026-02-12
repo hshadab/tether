@@ -41,7 +41,7 @@ app.post('/verify', async (req, res) => {
     });
   }
 
-  // SNARK verification via cosigner
+  // proof verification via cosigner
   try {
     const cosignerResult = await verifyCosigner(
       zkProof,

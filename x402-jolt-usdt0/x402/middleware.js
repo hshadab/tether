@@ -159,7 +159,7 @@ export function createZk402Middleware(config) {
       });
     }
 
-    // Gate 3: SNARK verification via cosigner
+    // Gate 3: proof verification via cosigner
     try {
       const cosignerResult = await verifyCosigner(
         zkProof,

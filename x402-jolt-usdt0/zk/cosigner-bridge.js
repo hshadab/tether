@@ -1,7 +1,7 @@
 import { COSIGNER_URL } from '../x402/config.js';
 
 /**
- * Submit a proof to the cosigner service for SNARK verification.
+ * Submit a proof to the cosigner service for proof verification.
  *
  * @param {{ proof, program_io, decision, model_hash }} proofResult
  * @param {{ to, amount, token }} txDetails

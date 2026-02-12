@@ -58,7 +58,7 @@ Here's what happens:
 
 4. **Check 1 — Binding: Does this proof belong to this payment?** The server recomputes SHA-256(amount|payTo|chainId|token|proofHash) and compares it to the hash embedded in the proof. If a compromised API inflates the price from 0.0001 to 10 USDT0, the hashes diverge — the payment is rejected instantly before the expensive SNARK check. This catches tampered amounts, redirected recipients, or switched tokens/chains.
 
-5. **Check 2 — SNARK verification: Did the ML model actually run?** The cosigner (an independent Rust verifier) checks the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction. This prevents forged proofs — you can't fake a valid SNARK without actually running the model.
+5. **Check 2 — proof verification: Did the ML model actually run?** The cosigner (an independent Rust verifier) checks the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) SNARK proof to confirm the ML model genuinely executed inside the zkVM and approved the transaction. This prevents forged proofs — you can't fake a valid SNARK without actually running the model.
 
 6. **Both checks pass → settlement.** The facilitator submits a `transferWithAuthorization` (EIP-3009) on USDT0. Funds move on Plasma, and the agent receives the weather data.
 
@@ -375,9 +375,9 @@ Proof binding:                       Payment header:
 
 Check 1 catches this before the cosigner is ever contacted — the agent's payment is blocked.
 
-**Check 2 — SNARK verification (cosigner):** Did the ML model actually run? Only if Check 1 passes, the middleware forwards the SNARK proof to the cosigner — an independent Rust verifier that confirms the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) proof is valid and the model genuinely executed inside the zkVM. This prevents forged proofs.
+**Check 2 — proof verification (cosigner):** Did the ML model actually run? Only if Check 1 passes, the middleware forwards the SNARK proof to the cosigner — an independent Rust verifier that confirms the [Jolt-Atlas](https://github.com/ICME-Lab/jolt-atlas) proof is valid and the model genuinely executed inside the zkVM. This prevents forged proofs.
 
-Both checks are needed: the binding prevents proof reuse with different payment parameters, while the SNARK verification prevents fabrication of proofs without running the model.
+Both checks are needed: the binding prevents proof reuse with different payment parameters, while the proof verification prevents fabrication of proofs without running the model.
 
 ## Network Configuration
 
