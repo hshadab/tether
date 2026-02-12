@@ -10,6 +10,7 @@ import {
   RPC_URL, MNEMONIC,
 } from './config.js';
 import { createZk402Middleware } from './middleware.js';
+import { STEPS } from '../shared/event-steps.js';
 import { scenarios } from '../zk/scenarios.js';
 import { runProverAsync } from '../zk/prover-bridge.js';
 import { getAgentCard } from '../a2a/agent-card.js';
@@ -163,7 +164,7 @@ app.post('/demo/start-flow', async (req, res) => {
 
   // 1. Reset
   broadcast({
-    step: 'flow_reset',
+    step: STEPS.FLOW_RESET,
     title: 'Flow Reset',
     description: `Starting ${scenario.name} scenario.`,
     actor: 'Client',
@@ -174,7 +175,7 @@ app.post('/demo/start-flow', async (req, res) => {
   try {
     // 2. Generate zkML proof (real async prover)
     broadcast({
-      step: 'zkml_proof_generating',
+      step: STEPS.PROOF_GENERATING,
       title: 'Generating zkML Proof',
       description: 'Running ONNX model inside Jolt zkVM...',
       actor: 'Client',
@@ -190,7 +191,7 @@ app.post('/demo/start-flow', async (req, res) => {
 
     // 3. Broadcast proof received with metadata
     broadcast({
-      step: 'zkml_proof_received',
+      step: STEPS.PROOF_RECEIVED,
       title: proofData.fromCache ? 'ZK Proof Loaded (Cached)' : 'ZK Proof Generated',
       description: proofData.fromCache
         ? `Client loaded cached proof, decision: ${proofData.decision}`
@@ -261,7 +262,7 @@ app.post('/demo/start-flow', async (req, res) => {
       const errBody = await paidResp.json().catch(() => ({}));
 
       broadcast({
-        step: 'verify_completed',
+        step: STEPS.VERIFY_COMPLETED,
         title: 'Verification Failed',
         description: `Attack blocked: ${errBody.reason || paidResp.statusText}`,
         actor: 'Server',
@@ -275,7 +276,7 @@ app.post('/demo/start-flow', async (req, res) => {
     let settlement = null;
     try {
       broadcast({
-        step: 'settlement_pending',
+        step: STEPS.SETTLEMENT_PENDING,
         title: 'Settling on Plasma…',
         description: `Submitting transferWithAuthorization for ${PRICE_USDT0} units USDT0.`,
         actor: 'Plasma',
@@ -284,7 +285,7 @@ app.post('/demo/start-flow', async (req, res) => {
 
       settlement = await settleX402(authorization, authSignature);
       broadcast({
-        step: 'settlement_completed',
+        step: STEPS.SETTLEMENT_COMPLETED,
         title: 'x402 USDT0 Settlement',
         description: `${PRICE_USDT0} units USDT0 settled via transferWithAuthorization on Plasma.`,
         actor: 'Plasma',
@@ -294,7 +295,7 @@ app.post('/demo/start-flow', async (req, res) => {
       console.log(`[x402 Settlement] TX confirmed: ${settlement.txHash} (EIP-3009 transferWithAuthorization)`);
     } catch (err) {
       broadcast({
-        step: 'settlement_completed',
+        step: STEPS.SETTLEMENT_COMPLETED,
         title: 'Settlement Failed',
         description: `x402 settlement failed: ${err.message}`,
         actor: 'Plasma',
@@ -305,7 +306,7 @@ app.post('/demo/start-flow', async (req, res) => {
     }
 
     broadcast({
-      step: 'verify_completed',
+      step: STEPS.VERIFY_COMPLETED,
       title: 'Verification & Settlement Complete',
       description: settlement?.txHash
         ? `All gates passed. ${PRICE_USDT0} units USDT0 settled on Plasma.`
@@ -331,7 +332,7 @@ app.post('/demo/start-flow', async (req, res) => {
 
 app.post('/demo/reset', (req, res) => {
   broadcast({
-    step: 'flow_reset',
+    step: STEPS.FLOW_RESET,
     title: 'Flow Reset',
     description: 'Timeline cleared.',
     actor: 'Server',
@@ -341,6 +342,7 @@ app.post('/demo/reset', (req, res) => {
 });
 
 app.get('/demo/status', (req, res) => {
+  const clientWallet = MNEMONIC ? ethers.Wallet.fromPhrase(MNEMONIC) : null;
   res.json({
     connectedClients: sseClients.length,
     serverAddress: PAY_TO_ADDRESS,
@@ -348,6 +350,10 @@ app.get('/demo/status', (req, res) => {
     chainId: CHAIN_ID,
     token: USDT0_ADDRESS,
     cosignerUrl: COSIGNER_URL,
+    explorerUrl: RPC_URL.includes('sepolia') ? 'https://sepolia.etherscan.io' : 'https://plasmascan.to',
+    rpcUrl: RPC_URL,
+    clientAddress: clientWallet?.address || '',
+    price: PRICE_USDT0,
   });
 });
 

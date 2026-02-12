@@ -1,9 +1,8 @@
-import { createHash } from 'crypto';
+import { randomUUID } from 'crypto';
 import {
   USDT0_ADDRESS, CHAIN_ID, PRICE_USDT0, PAY_TO_ADDRESS,
 } from '../x402/config.js';
-import { getScenarioProof } from '../zk/proof-cache.js';
-import { createPaymentBinding } from '../zk/proof-binding.js';
+import { loadScenarioProofWithBinding } from '../zk/load-proof.js';
 
 /**
  * Handle A2A tasks/send JSON-RPC requests.
@@ -24,39 +23,20 @@ export async function handleTaskSend(body) {
 
   try {
     // Load normal scenario proof
-    let proofData;
+    let payment, zkProof;
     try {
-      proofData = getScenarioProof('normal');
+      const paymentParams = { amount: PRICE_USDT0, payTo: PAY_TO_ADDRESS, chainId: CHAIN_ID, token: USDT0_ADDRESS };
+      ({ payment, zkProof } = loadScenarioProofWithBinding('normal', paymentParams));
     } catch {
       return {
         jsonrpc: '2.0',
         id,
         result: {
-          id: params?.id || crypto.randomUUID(),
+          id: params?.id || randomUUID(),
           status: { state: 'failed', message: { role: 'agent', parts: [{ type: 'text', text: 'No cached proof available. Run: npm run generate-cache' }] } },
         },
       };
     }
-
-    const proofHash = createHash('sha256').update(proofData.proof || '').digest('hex');
-    const paymentParams = { amount: PRICE_USDT0, payTo: PAY_TO_ADDRESS, chainId: CHAIN_ID, token: USDT0_ADDRESS };
-    const binding = createPaymentBinding(paymentParams, proofHash);
-
-    const payment = {
-      signature: '0x' + 'ab'.repeat(65),
-      amount: PRICE_USDT0,
-      payTo: PAY_TO_ADDRESS,
-      chainId: CHAIN_ID,
-      token: USDT0_ADDRESS,
-    };
-
-    const zkProof = {
-      proof: proofData.proof,
-      program_io: proofData.program_io,
-      decision: proofData.decision,
-      model_hash: proofData.model_hash,
-      payment_binding: binding,
-    };
 
     // The weather data would come from the server endpoint
     // For A2A, return simulated weather result
@@ -64,7 +44,7 @@ export async function handleTaskSend(body) {
       jsonrpc: '2.0',
       id,
       result: {
-        id: params?.id || crypto.randomUUID(),
+        id: params?.id || randomUUID(),
         status: {
           state: 'completed',
           message: {

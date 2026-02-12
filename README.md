@@ -199,15 +199,11 @@ if (result.success) {
 
 ## How the Proof Works
 
-1. **Binding check (Check 1)** — The server recomputes SHA-256 over `amount|payTo|chainId|token|proofHash` and compares it to the hash in the proof. If any parameter was tampered with, the hashes diverge and the payment is rejected instantly — before any cryptographic verification.
+Every payment goes through the two-check pipeline described above in [How It Protects Funds](#how-it-protects-funds). Additionally:
 
-2. **Model hash verification** — Both prover and cosigner compute SHA-256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
-
-3. **Guardrail verification (Check 2)** — Jolt-Atlas generates a proof of correct guardrail model execution. The cosigner verifies this against pre-computed verification parameters, confirming the guardrail model ran correctly.
-
-4. **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
-
-5. **Replay protection** — Each approval includes a monotonic nonce. The same proof can't be reused.
+- **Model hash verification** — Both prover and cosigner compute SHA-256 of the ONNX model. If they don't match, the proof is rejected. This prevents model swapping.
+- **Output check** — The proof includes the model's output. The cosigner confirms the output class is "AUTHORIZED" (class 0).
+- **Replay protection** — Each approval includes a monotonic nonce. The same proof can't be reused.
 
 ## Technical Details
 
@@ -220,19 +216,16 @@ if (result.success) {
 
 ### Environment Variables
 
-Copy `.env.example` to `.env`:
+Copy `.env.example` to `.env`. Key variables for getting started:
 
 | Variable | Description |
 |----------|-------------|
 | `MNEMONIC` | BIP-39 mnemonic for x402 client wallet (Plasma) |
-| `PAY_TO_ADDRESS` | Server wallet address that receives USDT0 payments |
-| `COSIGNER_PRIVATE_KEY` | Hex private key for cosigner (no 0x prefix) |
-| `COSIGNER_URL` | Cosigner endpoint (default: `http://localhost:3001`) |
 | `SEED_PHRASE` | BIP-39 mnemonic for WDK wallet (Sepolia client SDK) |
 | `SEPOLIA_RPC_URL` | Ethereum Sepolia RPC endpoint |
 | `TEST_USDT_ADDRESS` | Deployed test token address (Sepolia) |
 
-See `x402-jolt-usdt0/.env.example` for the full list of x402-specific variables.
+See [`x402-jolt-usdt0/.env.example`](x402-jolt-usdt0/.env.example) for the full list of environment variables (cosigner, server, facilitator, network configuration).
 
 ### Running Tests
 

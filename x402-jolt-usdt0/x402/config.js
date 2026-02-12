@@ -34,7 +34,7 @@ export const PRICE_USDT0 = 100; // 0.0001 USDT0 (6 decimals)
 export const COSIGNER_URL = process.env.COSIGNER_URL || 'http://localhost:3001';
 export const PROVER_BINARY = process.env.PROVER_BINARY || resolve(__dirname, '../../prover/target/release/zkml-prover');
 export const MODELS_DIR = process.env.MODELS_DIR || resolve(__dirname, '../../models');
-export const SRS_PATH = resolve(__dirname, '../../dory_srs_22_variables.srs');
+export const SRS_PATH = process.env.SRS_PATH || resolve(__dirname, '../../dory_srs_22_variables.srs');
 
 export const SERVER_PORT = parseInt(process.env.SERVER_PORT || '4020', 10);
 export const FACILITATOR_PORT = parseInt(process.env.FACILITATOR_PORT || '4021', 10);

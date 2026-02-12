@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { STEPS } from '../../../shared/event-steps.js';
 
 /* ═══════════════════════════════════════════════════════════════════════
    CONSTANTS
@@ -29,30 +30,32 @@ const PIPE = [
 ];
 
 const EV_MAP = {
-  flow_reset:            { node:0, dir:-1 },
-  zkml_proof_generating: { node:1, dir:0 },
-  zkml_proof_received:   { node:1, dir:1 },
-  payment_required:      { node:2, dir:0 },
-  verify_started:        { node:2, dir:2 },
-  zkml_binding_check:    { node:3, dir:3 },
-  zkml_proof_rejected:   { node:3, dir:3 },
-  zkml_proof_verified:   { node:4, dir:4 },
-  settlement_pending:    { node:5, dir:5 },
-  settlement_completed:  { node:5, dir:5 },
-  verify_completed:      { node:5, dir:5 },
+  [STEPS.FLOW_RESET]:           { node:0, dir:-1 },
+  [STEPS.PROOF_GENERATING]:     { node:1, dir:0 },
+  [STEPS.PROOF_RECEIVED]:       { node:1, dir:1 },
+  [STEPS.PAYMENT_REQUIRED]:     { node:2, dir:0 },
+  [STEPS.VERIFY_STARTED]:       { node:2, dir:2 },
+  [STEPS.BINDING_CHECK]:        { node:3, dir:3 },
+  [STEPS.PROOF_REJECTED]:       { node:3, dir:3 },
+  [STEPS.PROOF_VERIFIED]:       { node:4, dir:4 },
+  [STEPS.SETTLEMENT_PENDING]:   { node:5, dir:5 },
+  [STEPS.SETTLEMENT_COMPLETED]: { node:5, dir:5 },
+  [STEPS.VERIFY_COMPLETED]:     { node:5, dir:5 },
 };
 
 const BFIELDS = ['amount','payTo','chainId','token'];
 
-/* ── on-chain ─────────────────────────────────────────────────────── */
+/* ── on-chain defaults (overridden by /demo/status at startup) ──── */
 
-const EXP   = 'https://plasmascan.to';
-const RPC   = 'https://rpc.plasma.to';
-const USDT0 = '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb';
-const CLI_ADDR = '0x0c24ba337170D9fe066757e9F0007938e4975bdb';
-const SRV_ADDR = '0x8e473885423bb172c20c399834763d8DA8d24874';
-const ATK_ADDR = '0x000000000000000000000000000000000000dEaD';
-const PRICE = '0.0001';
+const DEFAULTS = {
+  EXP:      'https://plasmascan.to',
+  RPC:      'https://rpc.plasma.to',
+  USDT0:    '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb',
+  CLI_ADDR: '0x0c24ba337170D9fe066757e9F0007938e4975bdb',
+  SRV_ADDR: '0x8e473885423bb172c20c399834763d8DA8d24874',
+  ATK_ADDR: '0x000000000000000000000000000000000000dEaD',
+  PRICE:    '0.0001',
+};
 const DEC = 6;
 
 /* ── Dwell times (ms) — presentation pacing ───────────────────────── */
@@ -66,11 +69,11 @@ const WAIT_TIMEOUT   = 30000;
 /* ── helpers ──────────────────────────────────────────────────────── */
 
 const BAL_SIG = '0x70a08231';
-async function fetchBal(addr) {
+async function fetchBal(addr, rpc, token) {
   const pad = addr.replace('0x','').toLowerCase().padStart(64,'0');
   try {
-    const r = await fetch(RPC, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{to:USDT0,data:BAL_SIG+pad},'latest'] }) });
+    const r = await fetch(rpc, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{to:token,data:BAL_SIG+pad},'latest'] }) });
     const j = await r.json();
     if (j.result) return BigInt(j.result);
   } catch {}
@@ -86,8 +89,9 @@ function fmtB(raw) {
   return `${neg?'-':''}${w}.${f}`;
 }
 function short(a) { return a ? a.slice(0,6)+'…'+a.slice(-4) : ''; }
-function Lnk({addr,label}) {
-  return <a href={`${EXP}/address/${addr}`} target="_blank" rel="noopener noreferrer" style={S.link} title={addr}>{label||short(addr)}</a>;
+function Lnk({addr,label,exp}) {
+  const base = exp || DEFAULTS.EXP;
+  return <a href={`${base}/address/${addr}`} target="_blank" rel="noopener noreferrer" style={S.link} title={addr}>{label||short(addr)}</a>;
 }
 function fmt(v) { const s=String(v||''); return s.length>22 ? s.slice(0,10)+'…'+s.slice(-8) : s; }
 function hexStr(n) { let s=''; const c='0123456789abcdef'; for(let i=0;i<n;i++) s+=c[Math.random()*16|0]; return s; }
@@ -98,6 +102,27 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
    ═══════════════════════════════════════════════════════════════════════ */
 
 function App() {
+  /* ── runtime config from /demo/status ──────────────────────────── */
+  const [cfg, setCfg] = useState(DEFAULTS);
+  useEffect(() => {
+    fetch('/demo/status')
+      .then(r => r.json())
+      .then(d => {
+        setCfg(prev => ({
+          ...prev,
+          ...(d.explorerUrl && { EXP: d.explorerUrl }),
+          ...(d.rpcUrl && { RPC: d.rpcUrl }),
+          ...(d.token && { USDT0: d.token }),
+          ...(d.clientAddress && { CLI_ADDR: d.clientAddress }),
+          ...(d.serverAddress && { SRV_ADDR: d.serverAddress }),
+          ...(d.price != null && { PRICE: String(d.price / 1_000_000) }),
+        }));
+      })
+      .catch(() => {});
+  }, []);
+
+  const { EXP, RPC, USDT0, CLI_ADDR, SRV_ADDR, ATK_ADDR, PRICE } = cfg;
+
   /* ── persistent state ──────────────────────────────────────────── */
   const [sse, setSse]         = useState(false);
   const [running, setRunning] = useState(false);
@@ -138,10 +163,10 @@ function App() {
 
   /* ── balance fetch ──────────────────────────────────────────────── */
   const refreshBal = useCallback(async () => {
-    const [c,s] = await Promise.all([fetchBal(CLI_ADDR), fetchBal(SRV_ADDR)]);
+    const [c,s] = await Promise.all([fetchBal(CLI_ADDR, RPC, USDT0), fetchBal(SRV_ADDR, RPC, USDT0)]);
     setCBal(c); setSBal(s);
     return {client:c, server:s};
-  }, []);
+  }, [CLI_ADDR, SRV_ADDR, RPC, USDT0]);
 
   useEffect(() => { refreshBal(); const iv = setInterval(refreshBal, 15000); return () => clearInterval(iv); }, [refreshBal]);
 
@@ -156,7 +181,7 @@ function App() {
       /* update pipeline strip */
       const m = EV_MAP[ev.step];
       if (m) {
-        if (ev.step === 'verify_completed') {
+        if (ev.step === STEPS.VERIFY_COMPLETED) {
           if (ev.status === 'success') {
             setANode(5); setDoneN(new Set([0,1,2,3,4,5])); setFDir(5);
           }
@@ -168,10 +193,10 @@ function App() {
       }
 
       /* capture binding data */
-      if (ev.step === 'zkml_binding_check') { setBData(ev.details); bDataRef.current = ev.details; }
-      if (ev.step === 'zkml_proof_rejected') setStamp('REJECTED');
-      if (ev.step === 'zkml_proof_verified' && ev.details?.signature) { setCoSig(ev.details.signature); coSigRef.current = ev.details.signature; }
-      if (ev.step === 'settlement_completed' && ev.status === 'success' && ev.details?.txHash) { setTxHash(ev.details.txHash); txHashRef.current = ev.details.txHash; }
+      if (ev.step === STEPS.BINDING_CHECK) { setBData(ev.details); bDataRef.current = ev.details; }
+      if (ev.step === STEPS.PROOF_REJECTED) setStamp('REJECTED');
+      if (ev.step === STEPS.PROOF_VERIFIED && ev.details?.signature) { setCoSig(ev.details.signature); coSigRef.current = ev.details.signature; }
+      if (ev.step === STEPS.SETTLEMENT_COMPLETED && ev.status === 'success' && ev.details?.txHash) { setTxHash(ev.details.txHash); txHashRef.current = ev.details.txHash; }
 
       /* resolve pending waitForEvent promises */
       const waiters = pendingEvents.current[ev.step];
@@ -240,9 +265,9 @@ function App() {
       await showCard({ type:'intro', sc, idx:i }, INTRO_DWELL);
 
       /* ── Register event listeners BEFORE firing the request ── */
-      const evProving   = waitForEvent('zkml_proof_generating');
-      const evProved    = waitForEvent('zkml_proof_received');
-      const evPayReq    = waitForEvent('payment_required');
+      const evProving   = waitForEvent(STEPS.PROOF_GENERATING);
+      const evProved    = waitForEvent(STEPS.PROOF_RECEIVED);
+      const evPayReq    = waitForEvent(STEPS.PAYMENT_REQUIRED);
       const evComplete  = waitDone();
 
       /* ── Fire the scenario (don't await the fetch response) ── */
@@ -391,7 +416,7 @@ function App() {
 
       {/* ════ CENTER STAGE — the presentation area ════ */}
       <div style={{...S.stage, opacity: fadeClass==='visible'?1:0, transition:`opacity ${FADE_MS}ms ease`}} key={cardKey}>
-        {renderCard(card, proofHex)}
+        {renderCard(card, proofHex, { EXP, SRV_ADDR, CLI_ADDR, ATK_ADDR, USDT0, PRICE })}
       </div>
 
       {/* ════ FOOTER ════ */}
@@ -431,7 +456,8 @@ function ProveTimer() {
    CARD RENDERER — the big center-stage content
    ═══════════════════════════════════════════════════════════════════════ */
 
-function renderCard(c, proofHex) {
+function renderCard(c, proofHex, cfgVals = {}) {
+  const { EXP = DEFAULTS.EXP, SRV_ADDR = DEFAULTS.SRV_ADDR, CLI_ADDR = DEFAULTS.CLI_ADDR, ATK_ADDR = DEFAULTS.ATK_ADDR, USDT0 = DEFAULTS.USDT0, PRICE = DEFAULTS.PRICE } = cfgVals;
 
   /* ── WELCOME ── */
   if (c.type === 'welcome') {
@@ -509,9 +535,9 @@ function renderCard(c, proofHex) {
         {isAttack && sc.tamperField === 'payTo' && (
           <div style={S.tamperDiff}>
             <span style={S.tamperField}>payTo</span>
-            <span style={S.tamperFrom}><Lnk addr={SRV_ADDR} label="merchant"/></span>
+            <span style={S.tamperFrom}><Lnk addr={SRV_ADDR} label="merchant" exp={EXP}/></span>
             <span style={S.tamperArrow}>{'\u2192'}</span>
-            <span style={S.tamperTo}><Lnk addr={ATK_ADDR} label="0xdEaD…"/></span>
+            <span style={S.tamperTo}><Lnk addr={ATK_ADDR} label="0xdEaD…" exp={EXP}/></span>
           </div>
         )}
       </div>
@@ -594,7 +620,7 @@ function renderCard(c, proofHex) {
         <div style={{...S.resTitle, color:'#50AF95'}}>200 OK — Agent Payment Authorized</div>
         <div style={S.resSub}>Agent spending policy verified. Proof binding matched. Settlement via EIP-3009 on Plasma.</div>
         <div style={S.resFlow}>
-          <Lnk addr={CLI_ADDR} label="Agent"/> <span style={{margin:'0 10px', color:'#50AF95', fontWeight:700}}>{'\u2192'} {PRICE} USDT0 {'\u2192'}</span> <Lnk addr={SRV_ADDR} label="Merchant"/>
+          <Lnk addr={CLI_ADDR} label="Agent" exp={EXP}/> <span style={{margin:'0 10px', color:'#50AF95', fontWeight:700}}>{'\u2192'} {PRICE} USDT0 {'\u2192'}</span> <Lnk addr={SRV_ADDR} label="Merchant" exp={EXP}/>
         </div>
         {c.txHash && (
           <div style={S.txRow}>
@@ -632,8 +658,8 @@ function renderCard(c, proofHex) {
               return (
                 <div key={f} style={{...S.bRow, animation: !m?`cell-mismatch 0.8s ease-out ${i*0.15}s both`:'none'}}>
                   <span style={S.bFld}>{f}</span>
-                  <span style={{...S.bVal, color:m?'#50AF95':'#ef4444'}}>{(f==='payTo'||f==='token') ? <Lnk addr={pv}/> : fmt(pv)}</span>
-                  <span style={{...S.bVal, color:m?'#50AF95':'#ef4444'}}>{(f==='payTo'||f==='token') ? <Lnk addr={av}/> : fmt(av)}</span>
+                  <span style={{...S.bVal, color:m?'#50AF95':'#ef4444'}}>{(f==='payTo'||f==='token') ? <Lnk addr={pv} exp={EXP}/> : fmt(pv)}</span>
+                  <span style={{...S.bVal, color:m?'#50AF95':'#ef4444'}}>{(f==='payTo'||f==='token') ? <Lnk addr={av} exp={EXP}/> : fmt(av)}</span>
                   <span style={{...S.bMatch, color:m?'#50AF95':'#ef4444'}}>{m?'\u2713':'\u2717'}</span>
                 </div>
               );

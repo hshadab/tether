@@ -5,6 +5,14 @@ import { getCachedProof, cacheProof } from './proof-cache.js';
 import { createPaymentBinding } from './proof-binding.js';
 
 /**
+ * Compute proof hash and attach payment binding to a prover result.
+ */
+function attachBinding(result, paymentParams) {
+  const proofHash = createHash('sha256').update(result.proof).digest('hex');
+  result.payment_binding = createPaymentBinding(paymentParams, proofHash);
+}
+
+/**
  * Run the zkML prover binary to generate a proof.
  *
  * @param {object} features - Transaction features (budget, trust, amount, category, velocity, day, time)
@@ -45,9 +53,7 @@ export function runProver(features, paymentParams, { useCache = true } = {}) {
 
   console.log(`[Prover] Decision: ${result.decision}`);
 
-  // Compute proof hash and create payment binding
-  const proofHash = createHash('sha256').update(result.proof).digest('hex');
-  result.payment_binding = createPaymentBinding(paymentParams, proofHash);
+  attachBinding(result, paymentParams);
 
   // Cache the result
   if (useCache) {
@@ -109,9 +115,7 @@ export function runProverAsync(features, paymentParams, { useCache = true } = {}
 
           console.log(`[Prover] Decision: ${result.decision}`);
 
-          // Compute proof hash and create payment binding
-          const proofHash = createHash('sha256').update(result.proof).digest('hex');
-          result.payment_binding = createPaymentBinding(paymentParams, proofHash);
+          attachBinding(result, paymentParams);
 
           // Cache the result
           if (useCache) {

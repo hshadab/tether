@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { verifyPaymentBinding } from '../zk/proof-binding.js';
 import { verifyCosigner } from '../zk/cosigner-bridge.js';
+import { STEPS } from '../shared/event-steps.js';
 
 /**
  * Create ZK-402 middleware for Express.
@@ -21,7 +22,7 @@ export function createZk402Middleware(config) {
     // No payment header → 402 Payment Required
     if (!paymentHeader) {
       broadcast({
-        step: 'payment_required',
+        step: STEPS.PAYMENT_REQUIRED,
         title: 'Payment Required',
         description: `Server requires ${amount} units of USDT0 (0.0001 USDT0)`,
         actor: 'Server',
@@ -69,7 +70,7 @@ export function createZk402Middleware(config) {
 
     // SSE: verification started
     broadcast({
-      step: 'verify_started',
+      step: STEPS.VERIFY_STARTED,
       title: 'Verification Started',
       description: 'Server received payment + ZK proof, starting verification pipeline.',
       actor: 'Server',
@@ -80,7 +81,7 @@ export function createZk402Middleware(config) {
     // Gate 1: Verify payment signature exists and basic structure
     if (!payment.signature || !payment.amount || !payment.payTo) {
       broadcast({
-        step: 'verify_completed',
+        step: STEPS.VERIFY_COMPLETED,
         title: 'Verification Failed',
         description: 'Invalid payment structure.',
         actor: 'Server',
@@ -91,7 +92,7 @@ export function createZk402Middleware(config) {
 
     // SSE: ZK proof received
     broadcast({
-      step: 'zkml_proof_received',
+      step: STEPS.PROOF_RECEIVED,
       title: 'ZK Proof Received',
       description: `Received zkML proof (${zkProofHeader.length} bytes), decision: ${zkProof.decision}`,
       actor: 'Server',
@@ -116,7 +117,7 @@ export function createZk402Middleware(config) {
     const bindingResult = verifyPaymentBinding(zkProof.payment_binding, paymentParams, proofHash);
 
     broadcast({
-      step: 'zkml_binding_check',
+      step: STEPS.BINDING_CHECK,
       title: 'Binding Check',
       description: bindingResult.valid
         ? 'Proof binding matches payment parameters.'
@@ -135,7 +136,7 @@ export function createZk402Middleware(config) {
 
     if (!bindingResult.valid) {
       broadcast({
-        step: 'zkml_proof_rejected',
+        step: STEPS.PROOF_REJECTED,
         title: 'Proof Rejected',
         description: bindingResult.reason,
         actor: 'Server',
@@ -145,7 +146,7 @@ export function createZk402Middleware(config) {
 
       if (!deferCompletion) {
         broadcast({
-          step: 'verify_completed',
+          step: STEPS.VERIFY_COMPLETED,
           title: 'Verification Failed',
           description: `Attack blocked: ${bindingResult.reason}`,
           actor: 'Server',
@@ -169,7 +170,7 @@ export function createZk402Middleware(config) {
 
       if (!cosignerResult.approved) {
         broadcast({
-          step: 'zkml_proof_rejected',
+          step: STEPS.PROOF_REJECTED,
           title: 'Cosigner Rejected',
           description: `Cosigner rejected proof: ${cosignerResult.reason}`,
           actor: 'Cosigner',
@@ -183,7 +184,7 @@ export function createZk402Middleware(config) {
       }
 
       broadcast({
-        step: 'zkml_proof_verified',
+        step: STEPS.PROOF_VERIFIED,
         title: 'Proof Verified',
         description: 'Cosigner verified correct ML execution.',
         actor: 'Cosigner',
@@ -191,22 +192,26 @@ export function createZk402Middleware(config) {
         details: { nonce: cosignerResult.nonce, signature: cosignerResult.signature?.slice(0, 20) + '...' },
       });
     } catch (err) {
-      // Cosigner unavailable — log but allow binding-verified requests through
+      // Cosigner unavailable — fail closed (reject the request)
       console.warn(`[Middleware] Cosigner verification failed: ${err.message}`);
       broadcast({
-        step: 'zkml_proof_verified',
-        title: 'Proof Binding Verified (Cosigner Unavailable)',
-        description: 'Proof binding verified locally. Cosigner offline — proof check skipped.',
+        step: STEPS.PROOF_VERIFIED,
+        title: 'Cosigner Unavailable',
+        description: `Cosigner unavailable — cannot verify proof. Rejecting request.`,
         actor: 'Server',
-        status: 'success',
+        status: 'failure',
         details: { cosignerError: err.message },
+      });
+      return res.status(503).json({
+        error: 'Cosigner unavailable',
+        message: 'Proof verification requires the cosigner service. Please try again later.',
       });
     }
 
     // All gates passed
     if (!deferCompletion) {
       broadcast({
-        step: 'verify_completed',
+        step: STEPS.VERIFY_COMPLETED,
         title: 'Verification Complete',
         description: 'Payment and ZK proof verified. Serving protected resource.',
         actor: 'Server',

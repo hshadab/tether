@@ -4,7 +4,6 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { createHash } from 'crypto';
 import { appendFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -47,30 +46,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     // Step 2: Load cached proof
-    const { getScenarioProof } = await import('../../zk/proof-cache.js');
-    const { createPaymentBinding } = await import('../../zk/proof-binding.js');
+    const { loadScenarioProofWithBinding } = await import('../../zk/load-proof.js');
     const { USDT0_ADDRESS, CHAIN_ID, PRICE_USDT0, PAY_TO_ADDRESS } = await import('../../x402/config.js');
 
-    const proofData = getScenarioProof('normal');
-    const proofHash = createHash('sha256').update(proofData.proof || '').digest('hex');
     const paymentParams = { amount: PRICE_USDT0, payTo: PAY_TO_ADDRESS, chainId: CHAIN_ID, token: USDT0_ADDRESS };
-    const binding = createPaymentBinding(paymentParams, proofHash);
-
-    const payment = {
-      signature: '0x' + 'ab'.repeat(65),
-      amount: PRICE_USDT0,
-      payTo: PAY_TO_ADDRESS,
-      chainId: CHAIN_ID,
-      token: USDT0_ADDRESS,
-    };
-
-    const zkProof = {
-      proof: proofData.proof,
-      program_io: proofData.program_io,
-      decision: proofData.decision,
-      model_hash: proofData.model_hash,
-      payment_binding: binding,
-    };
+    const { payment, zkProof } = loadScenarioProofWithBinding('normal', paymentParams);
 
     const paymentHeader = Buffer.from(JSON.stringify(payment)).toString('base64');
     const zkProofHeader = Buffer.from(JSON.stringify(zkProof)).toString('base64');
@@ -88,7 +68,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Log the call
     try {
       appendFileSync(LOG_FILE, JSON.stringify({ timestamp: new Date().toISOString(), status: resp.status, data }) + '\n');
-    } catch {}
+    } catch (e) { console.error('[MCP] Log write failed:', e.message); }
 
     if (resp.status === 200) {
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };

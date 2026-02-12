@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { ethers } from 'ethers';
 import {
   USDT0_ADDRESS, CHAIN_ID, NETWORK, PRICE_USDT0,
@@ -72,7 +72,7 @@ async function main() {
     chainId: scenario.actualPaymentParams.chainId,
     token: scenario.actualPaymentParams.token,
     from: wallet.address,
-    nonce: Date.now(),
+    nonce: '0x' + randomBytes(32).toString('hex'),
   };
 
   const zkProof = {

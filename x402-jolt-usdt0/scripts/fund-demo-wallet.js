@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { ethers } from 'ethers';
+import { RPC_URL, CHAIN_ID, USDT0_ADDRESS } from '../x402/config.js';
 
-const PLASMA_RPC = 'https://rpc.plasma.to';
-const PLASMA_CHAIN_ID = 9745;
-const USDT0_ADDRESS = '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb';
+const PLASMA_RPC = RPC_URL;
+const PLASMA_CHAIN_ID = CHAIN_ID;
 
 const HARDHAT_MNEMONIC = 'test test test test test test test test test test test junk';
 
