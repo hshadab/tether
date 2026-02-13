@@ -58,21 +58,6 @@ app.post('/verify', async (req, res) => {
 });
 
 /**
- * POST /settle — Execute on-chain settlement (receiveWithAuthorization)
- */
-app.post('/settle', async (req, res) => {
-  // Placeholder: in production this would call receiveWithAuthorization on USDT0
-  const { payment, authorization } = req.body;
-  console.log(`[Facilitator] Settlement requested for amount=${payment?.amount} to=${payment?.payTo}`);
-
-  res.json({
-    settled: false,
-    reason: 'Settlement not yet implemented — requires funded facilitator wallet on Plasma.',
-    payment,
-  });
-});
-
-/**
  * GET /supported — Return supported verification schemes
  */
 app.get('/supported', (req, res) => {

@@ -319,7 +319,7 @@ app.post('/demo/start-flow', async (req, res) => {
     res.json({ success: true, scenario: scenarioName, settlement });
   } catch (err) {
     broadcast({
-      step: 'flow_error',
+      step: STEPS.FLOW_ERROR,
       title: 'Flow Error',
       description: err.message,
       actor: 'Server',

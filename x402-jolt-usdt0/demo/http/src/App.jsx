@@ -147,18 +147,12 @@ function App() {
   const [fadeClass, setFadeClass] = useState('visible');
 
   /* data accumulated per scenario — use refs so play() closure always has latest */
-  const [bData, setBData]     = useState(null);
-  const [stamp, setStamp]     = useState(null);
-  const [coSig, setCoSig]     = useState(null);
   const bDataRef = useRef(null);
   const coSigRef = useRef(null);
   const txHashRef = useRef(null);
-  const [txHash, setTxHash] = useState(null);
 
   const complRef = useRef(null);
   const pendingEvents = useRef({});
-  const proveTimerRef = useRef(null);
-  const [proveElapsed, setProveElapsed] = useState(0);
   const proofHex = useMemo(() => { const h = hexStr(120); return h+h; }, []);
 
   /* ── balance fetch ──────────────────────────────────────────────── */
@@ -193,10 +187,9 @@ function App() {
       }
 
       /* capture binding data */
-      if (ev.step === STEPS.BINDING_CHECK) { setBData(ev.details); bDataRef.current = ev.details; }
-      if (ev.step === STEPS.PROOF_REJECTED) setStamp('REJECTED');
-      if (ev.step === STEPS.PROOF_VERIFIED && ev.details?.signature) { setCoSig(ev.details.signature); coSigRef.current = ev.details.signature; }
-      if (ev.step === STEPS.SETTLEMENT_COMPLETED && ev.status === 'success' && ev.details?.txHash) { setTxHash(ev.details.txHash); txHashRef.current = ev.details.txHash; }
+      if (ev.step === STEPS.BINDING_CHECK) { bDataRef.current = ev.details; }
+      if (ev.step === STEPS.PROOF_VERIFIED && ev.details?.signature) { coSigRef.current = ev.details.signature; }
+      if (ev.step === STEPS.SETTLEMENT_COMPLETED && ev.status === 'success' && ev.details?.txHash) { txHashRef.current = ev.details.txHash; }
 
       /* resolve pending waitForEvent promises */
       const waiters = pendingEvents.current[ev.step];
@@ -232,19 +225,9 @@ function App() {
     return Promise.race([eventPromise, timeout]).catch(() => null);
   }, []);
 
-  const startProveTimer = useCallback(() => {
-    setProveElapsed(0);
-    proveTimerRef.current = setInterval(() => setProveElapsed(t => t + 1), 1000);
-  }, []);
-
-  const stopProveTimer = useCallback(() => {
-    if (proveTimerRef.current) { clearInterval(proveTimerRef.current); proveTimerRef.current = null; }
-  }, []);
-
   const play = useCallback(async () => {
     setRunning(true); setPhase('running'); setResults({});
     setANode(-1); setDoneN(new Set()); setFDir(-1);
-    setBData(null); setStamp(null); setCoSig(null); setTxHash(null);
     bDataRef.current = null; coSigRef.current = null; txHashRef.current = null;
 
     const snap = await refreshBal();
@@ -257,9 +240,7 @@ function App() {
       const sc = SCENARIOS[i];
       setScIdx(i);
       setANode(-1); setDoneN(new Set()); setFDir(-1);
-      setBData(null); setStamp(null); setCoSig(null); setTxHash(null);
       bDataRef.current = null; coSigRef.current = null; txHashRef.current = null;
-      stopProveTimer();
 
       /* ── INTRO CARD: explain what's about to happen ── */
       await showCard({ type:'intro', sc, idx:i }, INTRO_DWELL);
@@ -275,12 +256,10 @@ function App() {
 
       /* ── Wait for "proving" event → show proving card ── */
       await evProving;
-      startProveTimer();
       await showCard({ type:'action', step:'proving', sc, label:'Generating zkML proof…', sub:'ONNX model running inside Jolt-Atlas zkVM (ICME Labs)' }, 0);
 
       /* ── Wait for proof generated → show request card ── */
       const proofEv = await evProved;
-      stopProveTimer();
       await showCard({ type:'action', step:'request', sc, label:'Agent sends GET /weather', sub:'Autonomous HTTP request with x402 payment + ZK proof headers', proofMeta: proofEv?.details }, 0);
 
       /* ── Wait for 402 → brief dwell → show verify card ── */
@@ -296,10 +275,8 @@ function App() {
       /* ── RESULT CARD ── */
       if (status === 'success') {
         await showCard({ type:'result_ok', sc, bData:bDataRef.current, coSig:coSigRef.current, txHash:txHashRef.current }, CARD_DWELL);
-        setStamp('VERIFIED');
       } else {
         await showCard({ type:'result_fail', sc, bData:bDataRef.current, stamp:'REJECTED' }, CARD_DWELL);
-        setStamp('REJECTED');
       }
 
       /* refresh balances after each scenario */
@@ -312,7 +289,7 @@ function App() {
     await refreshBal();
     setPhase('complete'); setRunning(false); setScIdx(-1);
     await showCard({ type:'summary' }, 0);
-  }, [waitDone, waitForEvent, refreshBal, showCard, startProveTimer, stopProveTimer]);
+  }, [waitDone, waitForEvent, refreshBal, showCard]);
 
   /* ── deltas ─────────────────────────────────────────────────────── */
   const cDelta = (cSnap!=null && cBal!=null) ? cBal-cSnap : null;

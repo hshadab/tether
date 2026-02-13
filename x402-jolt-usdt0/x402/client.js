@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createHash, randomBytes } from 'crypto';
 import { ethers } from 'ethers';
 import {
-  USDT0_ADDRESS, CHAIN_ID, NETWORK, PRICE_USDT0,
+  USDT0_ADDRESS, CHAIN_ID,
   PAY_TO_ADDRESS, SERVER_PORT, MNEMONIC,
 } from './config.js';
 import { scenarios } from '../zk/scenarios.js';

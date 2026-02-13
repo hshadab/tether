@@ -1,5 +1,6 @@
 export const STEPS = {
   FLOW_RESET: 'flow_reset',
+  FLOW_ERROR: 'flow_error',
   PROOF_GENERATING: 'zkml_proof_generating',
   PROOF_RECEIVED: 'zkml_proof_received',
   PAYMENT_REQUIRED: 'payment_required',

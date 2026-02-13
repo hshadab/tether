@@ -1,5 +1,7 @@
 # ZK-402: Cryptographic Spending Guardrails for Autonomous Agent Payments
 
+Powered by [Jolt Atlas zkML](https://github.com/ICME-Lab/jolt-atlas).
+
 > *This is the detailed setup guide. See the [main README](../README.md) for project overview.*
 
 > Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 + WDK + USDT0 payment demo on Plasma — by adding a cryptographically verified spending guardrail to the payment path. x402 enables agents to pay for APIs with USDT0. This project adds the missing trust layer — cryptographic proof that every autonomous agent payment was evaluated and authorized by an ML guardrail model, verifiable by anyone.

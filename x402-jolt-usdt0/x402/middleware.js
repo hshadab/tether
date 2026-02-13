@@ -24,7 +24,7 @@ export function createZk402Middleware(config) {
       broadcast({
         step: STEPS.PAYMENT_REQUIRED,
         title: 'Payment Required',
-        description: `Server requires ${amount} units of USDT0 (0.0001 USDT0)`,
+        description: `Server requires ${amount} units of USDT0 (${amount / 1_000_000} USDT0)`,
         actor: 'Server',
         status: 'info',
         details: { amount, payTo, chainId, token, network },

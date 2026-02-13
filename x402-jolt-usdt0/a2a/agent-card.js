@@ -1,4 +1,4 @@
-import { NETWORK, USDT0_ADDRESS, PRICE_USDT0, SERVER_PORT } from '../x402/config.js';
+import { NETWORK, PRICE_USDT0, SERVER_PORT } from '../x402/config.js';
 
 /**
  * Generate an A2A AgentCard for the ZK-402 Weather Agent.
@@ -28,7 +28,7 @@ export function getAgentCard(req) {
       x402: {
         network: NETWORK,
         asset: 'USDT0',
-        price: '0.0001',
+        price: String(PRICE_USDT0 / 1_000_000),
         zkmlRequired: true,
       },
     },

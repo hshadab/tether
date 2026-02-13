@@ -1,5 +1,7 @@
 # Cryptographically Verifiable Spending Guardrails for USDT0 on Plasma
 
+Powered by [Jolt Atlas zkML](https://github.com/ICME-Lab/jolt-atlas).
+
 > Extends [baghdadgherras/x402-usdt0](https://github.com/baghdadgherras/x402-usdt0) — the reference x402 payment demo on Plasma — by adding a cryptographically verifiable spending guardrail to the payment path. Where the original demonstrates x402 payments with WDK + USDT0, this PoC adds a ZK proof that an ML guardrail model authorized every transaction for these exact parameters — making the payment rail tamper-evident and auditable without trusting any single party.
 
 **Cryptographic spending guardrails as a first-class primitive on the Tether stack.** This project integrates zkML verification natively into the [Tether WDK](https://docs.wallet.tether.io) payment path, settling in [USDT0](https://usdt0.to) on [Plasma](https://www.plasma.to).
@@ -186,7 +188,6 @@ if (result.success) {
 ├── cosigner/            # Rust HTTP service - verifies zkML proofs
 ├── contracts/           # Solidity - test token (Foundry)
 ├── models/              # ONNX model + vocabulary
-├── demo/                # Browser visualization
 └── x402-jolt-usdt0/     # x402 payment protocol + zkML on Plasma
     ├── x402/            #   Express server, client, facilitator, middleware
     ├── zk/              #   Proof binding, caching, prover/cosigner bridges
