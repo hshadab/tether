@@ -14,9 +14,12 @@ export class ProofGatedAdapter {
 
   /**
    * Register a ZK proof for a pending settlement.
+   * @param {string} settlementId
+   * @param {object} proofData
+   * @param {object} [txDetails] - Optional { to, amount, token } for cosigner verification
    */
-  registerProof(settlementId, proofData) {
-    this._pendingProofs.set(settlementId, proofData);
+  registerProof(settlementId, proofData, txDetails) {
+    this._pendingProofs.set(settlementId, { proofData, txDetails });
   }
 
   async getAddresses() {
@@ -30,16 +33,31 @@ export class ProofGatedAdapter {
   async writeContract(args) {
     // Find a matching proof for this write call
     const settlementId = this._findSettlementId(args);
-    const proofData = this._pendingProofs.get(settlementId);
+    const entry = this._pendingProofs.get(settlementId);
 
-    if (!proofData) {
+    if (!entry) {
       throw new Error(`No ZK proof registered for settlement "${settlementId}". Cannot execute writeContract.`);
+    }
+
+    const { proofData, txDetails } = entry;
+
+    // Determine real tx details: prefer explicit txDetails, else extract from args
+    let to, amount, token;
+    if (txDetails) {
+      ({ to, amount, token } = txDetails);
+    } else {
+      // For EIP-3009 transferWithAuthorization(from, to, value, ...),
+      // args.args contains the function arguments in order
+      const fnArgs = args.args || [];
+      to = fnArgs[1] || args.address;
+      amount = fnArgs[2] != null ? String(fnArgs[2]) : '0';
+      token = args.address; // writeContract is called on the token contract
     }
 
     // Verify proof via cosigner
     const cosignerResult = await verifyCosigner(
       proofData,
-      { to: args.address, amount: '0', token: args.address },
+      { to, amount, token },
       proofData.model_hash
     );
 

@@ -1,54 +1,20 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { randomBytes } from 'crypto';
 import { ethers } from 'ethers';
-import { eip3009ABI, authorizationTypes } from '@x402/evm';
+import { eip3009ABI } from '@x402/evm';
 import {
   USDT0_ADDRESS, CHAIN_ID, NETWORK, NETWORK_NAME,
   PRICE_USDT0, PAY_TO_ADDRESS, SERVER_PORT, COSIGNER_URL,
   RPC_URL, MNEMONIC,
 } from './config.js';
+import { signTransferAuthorization } from './signing.js';
 import { createZk402Middleware } from './middleware.js';
 import { STEPS } from '../shared/event-steps.js';
 import { scenarios } from '../zk/scenarios.js';
 import { runProverAsync } from '../zk/prover-bridge.js';
 import { getAgentCard } from '../a2a/agent-card.js';
 import { handleTaskSend } from '../a2a/task-handler.js';
-
-// --- x402 EIP-3009 settlement (TransferWithAuthorization) ---
-
-const EIP712_DOMAIN = {
-  name: 'USDT0',
-  version: '1',
-  chainId: CHAIN_ID,
-  verifyingContract: USDT0_ADDRESS,
-};
-
-/**
- * Client signs an EIP-712 TransferWithAuthorization message.
- * Returns the authorization object + signature.
- */
-async function signTransferAuthorization(clientWallet, to, value) {
-  const nonce = '0x' + randomBytes(32).toString('hex');
-  const now = Math.floor(Date.now() / 1000);
-  const authorization = {
-    from: clientWallet.address,
-    to,
-    value: String(value),
-    validAfter: String(now - 600),
-    validBefore: String(now + 3600),
-    nonce,
-  };
-
-  const signature = await clientWallet.signTypedData(
-    EIP712_DOMAIN,
-    authorizationTypes,
-    authorization,
-  );
-
-  return { authorization, signature };
-}
 
 /**
  * Facilitator submits the signed transferWithAuthorization on-chain.

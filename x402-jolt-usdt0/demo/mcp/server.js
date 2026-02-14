@@ -50,7 +50,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { USDT0_ADDRESS, CHAIN_ID, PRICE_USDT0, PAY_TO_ADDRESS } = await import('../../x402/config.js');
 
     const paymentParams = { amount: PRICE_USDT0, payTo: PAY_TO_ADDRESS, chainId: CHAIN_ID, token: USDT0_ADDRESS };
-    const { payment, zkProof } = loadScenarioProofWithBinding('normal', paymentParams);
+    const { payment, zkProof } = await loadScenarioProofWithBinding('normal', paymentParams);
 
     const paymentHeader = Buffer.from(JSON.stringify(payment)).toString('base64');
     const zkProofHeader = Buffer.from(JSON.stringify(zkProof)).toString('base64');

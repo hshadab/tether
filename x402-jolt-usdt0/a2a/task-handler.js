@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import {
-  USDT0_ADDRESS, CHAIN_ID, PRICE_USDT0, PAY_TO_ADDRESS,
+  USDT0_ADDRESS, CHAIN_ID, PRICE_USDT0, PAY_TO_ADDRESS, SERVER_PORT,
 } from '../x402/config.js';
 import { loadScenarioProofWithBinding } from '../zk/load-proof.js';
 
@@ -22,11 +22,11 @@ export async function handleTaskSend(body) {
   }
 
   try {
-    // Load normal scenario proof
+    // Load normal scenario proof (now async — real EIP-712 signing)
     let payment, zkProof;
     try {
       const paymentParams = { amount: PRICE_USDT0, payTo: PAY_TO_ADDRESS, chainId: CHAIN_ID, token: USDT0_ADDRESS };
-      ({ payment, zkProof } = loadScenarioProofWithBinding('normal', paymentParams));
+      ({ payment, zkProof } = await loadScenarioProofWithBinding('normal', paymentParams));
     } catch {
       return {
         jsonrpc: '2.0',
@@ -38,8 +38,39 @@ export async function handleTaskSend(body) {
       };
     }
 
-    // The weather data would come from the server endpoint
-    // For A2A, return simulated weather result
+    // Make a real HTTP request to the /weather endpoint with payment + proof headers
+    const paymentHeader = Buffer.from(JSON.stringify(payment)).toString('base64');
+    const zkProofHeader = Buffer.from(JSON.stringify(zkProof)).toString('base64');
+
+    const resp = await fetch(`http://localhost:${SERVER_PORT}/weather`, {
+      headers: {
+        'X-Payment': paymentHeader,
+        'X-ZK-Proof': zkProofHeader,
+      },
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          id: params?.id || randomUUID(),
+          status: {
+            state: 'failed',
+            message: {
+              role: 'agent',
+              parts: [{
+                type: 'text',
+                text: `ZK-402 verification failed (${resp.status}): ${data.reason || resp.statusText}`,
+              }],
+            },
+          },
+        },
+      };
+    }
+
     return {
       jsonrpc: '2.0',
       id,
@@ -59,12 +90,7 @@ export async function handleTaskSend(body) {
           name: 'weather-data',
           parts: [{
             type: 'text',
-            text: JSON.stringify({
-              location: 'San Francisco, CA',
-              temperature: 62,
-              conditions: 'Partly cloudy',
-              payment: { verified: true, zkProofValid: true },
-            }),
+            text: JSON.stringify(data),
           }],
         }],
       },

@@ -1,26 +1,40 @@
 import { createHash } from 'crypto';
+import { ethers } from 'ethers';
 import { getScenarioProof } from './proof-cache.js';
 import { createPaymentBinding } from './proof-binding.js';
+import { signTransferAuthorization } from '../x402/signing.js';
+import { MNEMONIC } from '../x402/config.js';
 
 /**
  * Load a scenario proof and create the payment + zkProof objects
  * ready for use as x402 headers.
  *
+ * Uses real EIP-712 signing (TransferWithAuthorization) for the payment signature.
+ *
  * @param {string} scenarioName - Scenario key (e.g. 'normal')
  * @param {object} paymentParams - { amount, payTo, chainId, token }
- * @returns {{ payment: object, zkProof: object, proofData: object }}
+ * @returns {Promise<{ payment: object, zkProof: object, proofData: object }>}
  */
-export function loadScenarioProofWithBinding(scenarioName, paymentParams) {
+export async function loadScenarioProofWithBinding(scenarioName, paymentParams) {
   const proofData = getScenarioProof(scenarioName);
   const proofHash = createHash('sha256').update(proofData.proof || '').digest('hex');
   const binding = createPaymentBinding(paymentParams, proofHash);
 
+  const wallet = ethers.Wallet.fromPhrase(MNEMONIC);
+  const { authorization, signature } = await signTransferAuthorization(
+    wallet,
+    paymentParams.payTo,
+    paymentParams.amount,
+  );
+
   const payment = {
-    signature: '0x' + 'ab'.repeat(65),
+    signature,
+    authorization,
     amount: paymentParams.amount,
     payTo: paymentParams.payTo,
     chainId: paymentParams.chainId,
     token: paymentParams.token,
+    from: wallet.address,
   };
 
   const zkProof = {

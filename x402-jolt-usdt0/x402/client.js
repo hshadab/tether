@@ -1,10 +1,11 @@
 import 'dotenv/config';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 import { ethers } from 'ethers';
 import {
   USDT0_ADDRESS, CHAIN_ID,
   PAY_TO_ADDRESS, SERVER_PORT, MNEMONIC,
 } from './config.js';
+import { signTransferAuthorization } from './signing.js';
 import { scenarios } from '../zk/scenarios.js';
 import { getScenarioProof } from '../zk/proof-cache.js';
 import { createPaymentBinding } from '../zk/proof-binding.js';
@@ -59,20 +60,24 @@ async function main() {
   const binding = createPaymentBinding(scenario.proofPaymentParams, proofHash);
   console.log(`[Client] Binding created: hash=${binding.binding_hash.slice(0, 16)}...`);
 
-  // Step 4: Sign payment with actual (potentially tampered) params
+  // Step 4: Sign payment with actual (potentially tampered) params via EIP-712
   const wallet = ethers.Wallet.fromPhrase(MNEMONIC);
   console.log(`[Client] Wallet address: ${wallet.address}`);
 
+  const { authorization, signature: authSignature } = await signTransferAuthorization(
+    wallet,
+    scenario.actualPaymentParams.payTo,
+    scenario.actualPaymentParams.amount,
+  );
+
   const payment = {
-    signature: await wallet.signMessage(
-      `x402:${scenario.actualPaymentParams.amount}:${scenario.actualPaymentParams.payTo}:${CHAIN_ID}`
-    ),
+    signature: authSignature,
+    authorization,
     amount: scenario.actualPaymentParams.amount,
     payTo: scenario.actualPaymentParams.payTo,
     chainId: scenario.actualPaymentParams.chainId,
     token: scenario.actualPaymentParams.token,
     from: wallet.address,
-    nonce: '0x' + randomBytes(32).toString('hex'),
   };
 
   const zkProof = {
